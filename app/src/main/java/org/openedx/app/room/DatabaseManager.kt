@@ -17,8 +17,7 @@ class DatabaseManager(
 ) : DatabaseManager {
     override fun clearTables() {
         CoroutineScope(Dispatchers.IO).launch {
-            courseDao.clearCachedData()
-            courseDao.clearEnrollmentCachedData()
+            courseDao.clearCourseData()
             dashboardDao.clearCachedData()
             downloadDao.clearOfflineProgress()
             discoveryDao.clearCachedData()

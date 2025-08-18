@@ -14,6 +14,7 @@ import org.openedx.core.domain.model.CourseComponentStatus
 import org.openedx.core.domain.model.CourseDatesBannerInfo
 import org.openedx.core.domain.model.CourseDatesResult
 import org.openedx.core.domain.model.CourseEnrollmentDetails
+import org.openedx.core.domain.model.CourseProgress
 import org.openedx.core.domain.model.CourseStructure
 import org.openedx.core.exception.NoCachedDataException
 import org.openedx.core.extension.channelFlowWithAwait
@@ -45,7 +46,10 @@ class CourseRepository(
 
     suspend fun getAllDownloadModels() = downloadDao.readAllData().map { it.mapToDomain() }
 
-    suspend fun getCourseStructureFlow(courseId: String, forceRefresh: Boolean = true): Flow<CourseStructure> =
+    suspend fun getCourseStructureFlow(
+        courseId: String,
+        forceRefresh: Boolean = true
+    ): Flow<CourseStructure> =
         channelFlowWithAwait {
             var hasCourseStructure = false
             val cachedCourseStructure = courseStructure[courseId] ?: (
@@ -235,4 +239,17 @@ class CourseRepository(
             downloadDao.removeOfflineXBlockProgress(listOf(blockId))
         }
     }
+
+    fun getCourseProgress(courseId: String, isRefresh: Boolean): Flow<CourseProgress> =
+        channelFlowWithAwait {
+            if (!isRefresh) {
+                val cached = courseDao.getCourseProgressById(courseId)
+                if (cached != null) {
+                    trySend(cached.mapToDomain())
+                }
+            }
+            val response = api.getCourseProgress(courseId)
+            courseDao.insertCourseProgressEntity(response.mapToRoomEntity(courseId))
+            trySend(response.mapToDomain())
+        }
 }
