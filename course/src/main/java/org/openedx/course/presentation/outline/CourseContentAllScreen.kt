@@ -4,21 +4,16 @@ import android.content.res.Configuration.UI_MODE_NIGHT_NO
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.Icon
-import androidx.compose.material.LinearProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Surface
@@ -34,20 +29,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.AndroidUriHandler
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentManager
 import org.openedx.core.BlockType
-import org.openedx.core.NoContentScreenType
 import org.openedx.core.domain.model.AssignmentProgress
 import org.openedx.core.domain.model.Block
 import org.openedx.core.domain.model.BlockCounts
@@ -56,10 +49,10 @@ import org.openedx.core.domain.model.CourseStructure
 import org.openedx.core.domain.model.CoursewareAccess
 import org.openedx.core.domain.model.OfflineDownload
 import org.openedx.core.domain.model.Progress
+import org.openedx.core.extension.getChapterBlocks
 import org.openedx.core.presentation.course.CourseViewMode
 import org.openedx.core.ui.CircularProgress
 import org.openedx.core.ui.HandleUIMessage
-import org.openedx.core.ui.NoContentScreen
 import org.openedx.core.ui.OpenEdXButton
 import org.openedx.core.ui.TextIcon
 import org.openedx.core.ui.displayCutoutForLandscape
@@ -67,9 +60,11 @@ import org.openedx.core.ui.theme.OpenEdXTheme
 import org.openedx.core.ui.theme.appColors
 import org.openedx.core.ui.theme.appTypography
 import org.openedx.course.R
+import org.openedx.course.presentation.contenttab.CourseContentAllEmptyState
 import org.openedx.course.presentation.ui.CourseDatesBanner
 import org.openedx.course.presentation.ui.CourseDatesBannerTablet
 import org.openedx.course.presentation.ui.CourseMessage
+import org.openedx.course.presentation.ui.CourseProgress
 import org.openedx.course.presentation.ui.CourseSection
 import org.openedx.foundation.extension.takeIfNotEmpty
 import org.openedx.foundation.presentation.UIMessage
@@ -79,11 +74,11 @@ import org.openedx.foundation.presentation.windowSizeValue
 import java.util.Date
 
 @Composable
-fun CourseOutlineScreen(
+fun CourseContentAllScreen(
     windowSize: WindowSize,
-    viewModel: CourseOutlineViewModel,
+    viewModel: CourseContentAllViewModel,
     fragmentManager: FragmentManager,
-    onResetDatesClick: () -> Unit,
+    onNavigateToHome: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val uiMessage by viewModel.uiMessage.collectAsState(null)
@@ -96,10 +91,11 @@ fun CourseOutlineScreen(
         }
     }
 
-    CourseOutlineUI(
+    CourseContentAllUI(
         windowSize = windowSize,
         uiState = uiState,
         uiMessage = uiMessage,
+        onNavigateToHome = onNavigateToHome,
         onExpandClick = { block ->
             if (viewModel.switchCourseSections(block.id)) {
                 viewModel.sequentialClickedEvent(
@@ -148,11 +144,7 @@ fun CourseOutlineScreen(
             )
         },
         onResetDatesClick = {
-            viewModel.resetCourseDatesBanner(
-                onResetDates = {
-                    onResetDatesClick()
-                }
-            )
+            viewModel.resetCourseDatesBanner()
         },
         onCertificateClick = {
             viewModel.viewCertificateTappedEvent()
@@ -163,10 +155,11 @@ fun CourseOutlineScreen(
 }
 
 @Composable
-private fun CourseOutlineUI(
+private fun CourseContentAllUI(
     windowSize: WindowSize,
-    uiState: CourseOutlineUIState,
+    uiState: CourseContentAllUIState,
     uiMessage: UIMessage?,
+    onNavigateToHome: () -> Unit,
     onExpandClick: (Block) -> Unit,
     onSubSectionClick: (Block) -> Unit,
     onResumeClick: (String) -> Unit,
@@ -224,9 +217,11 @@ private fun CourseOutlineUI(
             ) {
                 Box {
                     when (uiState) {
-                        is CourseOutlineUIState.CourseData -> {
+                        is CourseContentAllUIState.CourseData -> {
                             if (uiState.courseStructure.blockData.isEmpty()) {
-                                NoContentScreen(noContentScreenType = NoContentScreenType.COURSE_OUTLINE)
+                                CourseContentAllEmptyState(
+                                    onReturnToCourseClick = onNavigateToHome
+                                )
                             } else {
                                 LazyColumn(
                                     modifier = Modifier.fillMaxSize(),
@@ -276,40 +271,39 @@ private fun CourseOutlineUI(
                                         }
                                     }
 
-                                    val progress = uiState.courseStructure.progress
-                                    if (progress != null && progress.totalAssignmentsCount > 0) {
-                                        item {
-                                            CourseProgress(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(
-                                                        top = 16.dp,
-                                                        start = 24.dp,
-                                                        end = 24.dp
-                                                    ),
-                                                progress = progress
+                                    val sections =
+                                        uiState.courseStructure.blockData.getChapterBlocks()
+                                    val progress = Progress(
+                                        total = sections.size,
+                                        completed = sections.filter { it.isCompleted() }.size
+                                    )
+                                    item {
+                                        CourseProgress(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(
+                                                    start = 24.dp,
+                                                    end = 24.dp
+                                                ),
+                                            progress = progress,
+                                            description = pluralStringResource(
+                                                R.plurals.course_sections_complete,
+                                                progress.completed,
+                                                progress.completed,
+                                                progress.total
                                             )
-                                        }
+                                        )
                                     }
 
                                     if (uiState.resumeComponent != null) {
                                         item {
                                             Box(listPadding) {
-                                                if (windowSize.isTablet) {
-                                                    ResumeCourseTablet(
-                                                        modifier = Modifier.padding(vertical = 16.dp),
-                                                        block = uiState.resumeComponent,
-                                                        displayName = uiState.resumeUnitTitle,
-                                                        onResumeClick = onResumeClick
-                                                    )
-                                                } else {
-                                                    ResumeCourse(
-                                                        modifier = Modifier.padding(vertical = 16.dp),
-                                                        block = uiState.resumeComponent,
-                                                        displayName = uiState.resumeUnitTitle,
-                                                        onResumeClick = onResumeClick
-                                                    )
-                                                }
+                                                ResumeCourse(
+                                                    modifier = Modifier.padding(vertical = 16.dp),
+                                                    block = uiState.resumeComponent,
+                                                    displayName = uiState.resumeUnitTitle,
+                                                    onResumeClick = onResumeClick
+                                                )
                                             }
                                         }
                                     }
@@ -329,7 +323,7 @@ private fun CourseOutlineUI(
                                                 block = section,
                                                 onItemClick = onExpandClick,
                                                 useRelativeDates = uiState.useRelativeDates,
-                                                courseSectionsState = courseSectionsState,
+                                                isSectionVisible = courseSectionsState,
                                                 courseSubSections = courseSubSections,
                                                 downloadedStateMap = uiState.downloadedState,
                                                 onSubSectionClick = onSubSectionClick,
@@ -341,11 +335,13 @@ private fun CourseOutlineUI(
                             }
                         }
 
-                        CourseOutlineUIState.Error -> {
-                            NoContentScreen(noContentScreenType = NoContentScreenType.COURSE_OUTLINE)
+                        CourseContentAllUIState.Error -> {
+                            CourseContentAllEmptyState(
+                                onReturnToCourseClick = onNavigateToHome
+                            )
                         }
 
-                        CourseOutlineUIState.Loading -> {
+                        CourseContentAllUIState.Loading -> {
                             CircularProgress()
                         }
                     }
@@ -362,139 +358,35 @@ private fun ResumeCourse(
     displayName: String,
     onResumeClick: (String) -> Unit,
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth()
-    ) {
-        Text(
-            text = stringResource(id = R.string.course_continue_with),
-            style = MaterialTheme.appTypography.labelMedium,
-            color = MaterialTheme.appColors.textPrimaryVariant
-        )
-        Spacer(Modifier.height(6.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                modifier = Modifier.size(24.dp),
-                painter = painterResource(id = getUnitBlockIcon(block)),
-                contentDescription = null,
-                tint = MaterialTheme.appColors.textPrimary
-            )
-            Text(
-                text = displayName,
-                color = MaterialTheme.appColors.textPrimary,
-                style = MaterialTheme.appTypography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Spacer(Modifier.height(24.dp))
-        OpenEdXButton(
-            text = stringResource(id = R.string.course_resume),
-            onClick = {
-                onResumeClick(block.id)
-            },
-            content = {
-                TextIcon(
-                    text = stringResource(id = R.string.course_resume),
-                    icon = Icons.AutoMirrored.Filled.ArrowForward,
-                    color = MaterialTheme.appColors.primaryButtonText,
-                    textStyle = MaterialTheme.appTypography.labelLarge
-                )
-            }
-        )
-    }
-}
-
-@Composable
-private fun ResumeCourseTablet(
-    modifier: Modifier = Modifier,
-    block: Block,
-    displayName: String,
-    onResumeClick: (String) -> Unit,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column(
-            Modifier
-                .weight(1f)
-                .padding(end = 35.dp)
-        ) {
-            Text(
-                text = stringResource(id = R.string.course_continue_with),
-                style = MaterialTheme.appTypography.labelMedium,
-                color = MaterialTheme.appColors.textPrimaryVariant
-            )
-            Spacer(Modifier.height(6.dp))
+    OpenEdXButton(
+        modifier = modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 54.dp),
+        onClick = {
+            onResumeClick(block.id)
+        },
+        content = {
             Row(
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    modifier = Modifier.size(size = (MaterialTheme.appTypography.titleMedium.fontSize.value + 4).dp),
-                    painter = painterResource(id = getUnitBlockIcon(block)),
-                    contentDescription = null,
-                    tint = MaterialTheme.appColors.textPrimary
-                )
                 Text(
+                    modifier = Modifier.weight(1f),
                     text = displayName,
-                    color = MaterialTheme.appColors.textPrimary,
+                    color = MaterialTheme.appColors.primaryButtonText,
                     style = MaterialTheme.appTypography.titleMedium,
-                    overflow = TextOverflow.Ellipsis,
-                    maxLines = 4
+                    fontWeight = FontWeight.W600
                 )
-            }
-        }
-        OpenEdXButton(
-            modifier = Modifier.width(210.dp),
-            text = stringResource(id = R.string.course_resume),
-            onClick = {
-                onResumeClick(block.id)
-            },
-            content = {
                 TextIcon(
-                    text = stringResource(id = R.string.course_resume),
+                    text = stringResource(id = R.string.course_continue),
                     icon = Icons.AutoMirrored.Filled.ArrowForward,
                     color = MaterialTheme.appColors.primaryButtonText,
                     textStyle = MaterialTheme.appTypography.labelLarge
                 )
             }
-        )
-    }
-}
-
-@Composable
-private fun CourseProgress(
-    modifier: Modifier = Modifier,
-    progress: Progress,
-) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        LinearProgressIndicator(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(10.dp)
-                .clip(CircleShape),
-            progress = progress.value,
-            color = MaterialTheme.appColors.progressBarColor,
-            backgroundColor = MaterialTheme.appColors.progressBarBackgroundColor
-        )
-        Text(
-            text = pluralStringResource(
-                R.plurals.course_assignments_complete,
-                progress.assignmentsCompleted,
-                progress.assignmentsCompleted,
-                progress.totalAssignmentsCount
-            ),
-            color = MaterialTheme.appColors.textDark,
-            style = MaterialTheme.appTypography.labelSmall
-        )
-    }
+        }
+    )
 }
 
 fun getUnitBlockIcon(block: Block): Int {
@@ -511,9 +403,9 @@ fun getUnitBlockIcon(block: Block): Int {
 @Composable
 private fun CourseOutlineScreenPreview() {
     OpenEdXTheme {
-        CourseOutlineUI(
+        CourseContentAllUI(
             windowSize = WindowSize(WindowType.Compact, WindowType.Compact),
-            uiState = CourseOutlineUIState.CourseData(
+            uiState = CourseContentAllUIState.CourseData(
                 mockCourseStructure,
                 mapOf(),
                 mockChapterBlock,
@@ -537,6 +429,7 @@ private fun CourseOutlineScreenPreview() {
             onDownloadClick = {},
             onResetDatesClick = {},
             onCertificateClick = {},
+            onNavigateToHome = {},
         )
     }
 }
@@ -544,11 +437,11 @@ private fun CourseOutlineScreenPreview() {
 @Preview(uiMode = UI_MODE_NIGHT_NO, device = Devices.NEXUS_9)
 @Preview(uiMode = UI_MODE_NIGHT_YES, device = Devices.NEXUS_9)
 @Composable
-private fun CourseOutlineScreenTabletPreview() {
+private fun CourseContentAllScreenTabletPreview() {
     OpenEdXTheme {
-        CourseOutlineUI(
+        CourseContentAllUI(
             windowSize = WindowSize(WindowType.Medium, WindowType.Medium),
-            uiState = CourseOutlineUIState.CourseData(
+            uiState = CourseContentAllUIState.CourseData(
                 mockCourseStructure,
                 mapOf(),
                 mockChapterBlock,
@@ -572,6 +465,7 @@ private fun CourseOutlineScreenTabletPreview() {
             onDownloadClick = {},
             onResetDatesClick = {},
             onCertificateClick = {},
+            onNavigateToHome = {},
         )
     }
 }
@@ -588,7 +482,8 @@ private fun ResumeCoursePreview() {
 private val mockAssignmentProgress = AssignmentProgress(
     assignmentType = "Home",
     numPointsEarned = 1f,
-    numPointsPossible = 3f
+    numPointsPossible = 3f,
+    shortLabel = "HM1"
 )
 private val mockChapterBlock = Block(
     id = "id",

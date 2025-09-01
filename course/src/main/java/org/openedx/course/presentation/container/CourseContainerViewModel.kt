@@ -284,7 +284,7 @@ class CourseContainerViewModel(
                 updateData()
             }
 
-            CourseContainerTab.VIDEOS -> {
+            CourseContainerTab.CONTENT -> {
                 updateData()
             }
 
@@ -332,12 +332,12 @@ class CourseContainerViewModel(
     fun courseContainerTabClickedEvent(index: Int) {
         when (CourseContainerTab.entries[index]) {
             CourseContainerTab.HOME -> courseTabClickedEvent()
-            CourseContainerTab.VIDEOS -> videoTabClickedEvent()
             CourseContainerTab.DISCUSSIONS -> discussionTabClickedEvent()
             CourseContainerTab.DATES -> datesTabClickedEvent()
             CourseContainerTab.PROGRESS -> progressTabClickedEvent()
             CourseContainerTab.MORE -> moreTabClickedEvent()
-            CourseContainerTab.OFFLINE -> {}
+            CourseContainerTab.OFFLINE -> offlineTabClickedEvent()
+            CourseContainerTab.CONTENT -> contentTabClickedEvent()
         }
     }
 
@@ -373,10 +373,6 @@ class CourseContainerViewModel(
         logCourseContainerEvent(CourseAnalyticsEvent.HOME_TAB)
     }
 
-    private fun videoTabClickedEvent() {
-        logCourseContainerEvent(CourseAnalyticsEvent.VIDEOS_TAB)
-    }
-
     private fun discussionTabClickedEvent() {
         logCourseContainerEvent(CourseAnalyticsEvent.DISCUSSION_TAB)
     }
@@ -393,6 +389,13 @@ class CourseContainerViewModel(
         logCourseContainerEvent(CourseAnalyticsEvent.PROGRESS_TAB)
     }
 
+    private fun offlineTabClickedEvent() {
+        logCourseContainerEvent(CourseAnalyticsEvent.OFFLINE_TAB)
+    }
+
+    private fun contentTabClickedEvent() {
+        logCourseContainerEvent(CourseAnalyticsEvent.CONTENT_TAB)
+    }
     private fun logCourseContainerEvent(event: CourseAnalyticsEvent) {
         courseAnalytics.logScreenEvent(
             screenName = event.eventName,

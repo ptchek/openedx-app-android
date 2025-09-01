@@ -7,6 +7,7 @@ import org.openedx.core.ApiConstants
 import org.openedx.core.data.api.CourseApi
 import org.openedx.core.data.model.BlocksCompletionBody
 import org.openedx.core.data.model.room.OfflineXBlockProgress
+import org.openedx.core.data.model.room.VideoProgressEntity
 import org.openedx.core.data.model.room.XBlockProgressData
 import org.openedx.core.data.storage.CorePreferences
 import org.openedx.core.data.storage.CourseDao
@@ -238,6 +239,21 @@ class CourseRepository(
             api.submitOfflineXBlockProgress(courseId, blockId, parts)
             downloadDao.removeOfflineXBlockProgress(listOf(blockId))
         }
+    }
+
+    suspend fun saveVideoProgress(
+        blockId: String,
+        videoUrl: String,
+        videoTime: Long,
+        duration: Long
+    ) {
+        val videoProgressEntity = VideoProgressEntity(blockId, videoUrl, videoTime, duration)
+        courseDao.insertVideoProgressEntity(videoProgressEntity)
+    }
+
+    suspend fun getVideoProgress(blockId: String): VideoProgressEntity {
+        return courseDao.getVideoProgressByBlockId(blockId)
+            ?: VideoProgressEntity(blockId, "", 0L, 0L)
     }
 
     fun getCourseProgress(courseId: String, isRefresh: Boolean): Flow<CourseProgress> =

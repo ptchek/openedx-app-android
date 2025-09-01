@@ -24,6 +24,7 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.Divider
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Scaffold
@@ -32,6 +33,7 @@ import androidx.compose.material.SnackbarDuration
 import androidx.compose.material.SnackbarHost
 import androidx.compose.material.SnackbarHostState
 import androidx.compose.material.Text
+import androidx.compose.material.TextButton
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -72,6 +74,7 @@ import org.openedx.core.domain.model.CourseAccessError
 import org.openedx.core.extension.isFalse
 import org.openedx.core.presentation.global.viewBinding
 import org.openedx.core.ui.HandleUIMessage
+import org.openedx.core.ui.IconText
 import org.openedx.core.ui.OfflineModeDialog
 import org.openedx.core.ui.OpenEdXButton
 import org.openedx.core.ui.RoundTabsBar
@@ -83,19 +86,19 @@ import org.openedx.core.utils.TimeUtils
 import org.openedx.course.DatesShiftedSnackBar
 import org.openedx.course.R
 import org.openedx.course.databinding.FragmentCourseContainerBinding
+import org.openedx.course.presentation.contenttab.ContentTabScreen
 import org.openedx.course.presentation.dates.CourseDatesScreen
 import org.openedx.course.presentation.handouts.HandoutsScreen
 import org.openedx.course.presentation.handouts.HandoutsType
 import org.openedx.course.presentation.offline.CourseOfflineScreen
-import org.openedx.course.presentation.outline.CourseOutlineScreen
 import org.openedx.course.presentation.progress.CourseProgressScreen
-import org.openedx.course.presentation.ui.CourseVideosScreen
 import org.openedx.course.presentation.ui.DatesShiftedSnackBar
 import org.openedx.discussion.presentation.topics.DiscussionTopicsScreen
 import org.openedx.foundation.extension.takeIfNotEmpty
 import org.openedx.foundation.presentation.WindowSize
 import org.openedx.foundation.presentation.rememberWindowSize
 import java.util.Date
+import org.openedx.core.R as coreR
 
 class CourseContainerFragment : Fragment(R.layout.fragment_course_container) {
 
@@ -249,6 +252,35 @@ fun CourseDashboard(
     fragmentManager: FragmentManager,
     onRefresh: (page: Int) -> Unit,
 ) {
+    val refreshing by viewModel.refreshing.collectAsState(true)
+    val courseImage by viewModel.courseImage.collectAsState()
+    val uiMessage by viewModel.uiMessage.collectAsState(null)
+    val requiredTab = when (openTab.uppercase()) {
+        CourseContainerTab.HOME.name -> CourseContainerTab.HOME
+        CourseContainerTab.DATES.name -> CourseContainerTab.DATES
+        CourseContainerTab.DISCUSSIONS.name -> CourseContainerTab.DISCUSSIONS
+        CourseContainerTab.PROGRESS.name -> CourseContainerTab.PROGRESS
+        CourseContainerTab.MORE.name -> CourseContainerTab.MORE
+        else -> CourseContainerTab.HOME
+    }
+
+    val pagerState = rememberPagerState(
+        initialPage = CourseContainerTab.entries.indexOf(requiredTab),
+        pageCount = { CourseContainerTab.entries.size }
+    )
+    val contentTabPagerState = rememberPagerState(
+        initialPage = 0,
+        pageCount = { CourseContentTab.entries.size }
+    )
+    val accessStatus = viewModel.courseAccessStatus.observeAsState()
+    val tabState = rememberLazyListState()
+    val snackState = remember { SnackbarHostState() }
+    var selectedContentTab by remember { mutableStateOf(CourseContentTab.ALL) }
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = refreshing,
+        onRefresh = { onRefresh(pagerState.currentPage) }
+    )
+
     OpenEdXTheme {
         val windowSize = rememberWindowSize()
         val scope = rememberCoroutineScope()
@@ -258,32 +290,51 @@ fun CourseDashboard(
                 .fillMaxSize()
                 .navigationBarsPadding(),
             scaffoldState = scaffoldState,
-            backgroundColor = MaterialTheme.appColors.background
-        ) { paddingValues ->
-            val refreshing by viewModel.refreshing.collectAsState(true)
-            val courseImage by viewModel.courseImage.collectAsState()
-            val uiMessage by viewModel.uiMessage.collectAsState(null)
-            val requiredTab = when (openTab.uppercase()) {
-                CourseContainerTab.HOME.name -> CourseContainerTab.HOME
-                CourseContainerTab.VIDEOS.name -> CourseContainerTab.VIDEOS
-                CourseContainerTab.DATES.name -> CourseContainerTab.DATES
-                CourseContainerTab.DISCUSSIONS.name -> CourseContainerTab.DISCUSSIONS
-                CourseContainerTab.PROGRESS.name -> CourseContainerTab.PROGRESS
-                CourseContainerTab.MORE.name -> CourseContainerTab.MORE
-                else -> CourseContainerTab.HOME
+            backgroundColor = MaterialTheme.appColors.background,
+            bottomBar = {
+                Box {
+                    if (CourseContainerTab.entries[pagerState.currentPage] == CourseContainerTab.CONTENT &&
+                        selectedContentTab == CourseContentTab.ASSIGNMENTS
+                    ) {
+                        Column(
+                            modifier = Modifier.background(MaterialTheme.appColors.background),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Divider(modifier = Modifier.fillMaxWidth())
+                            TextButton(
+                                onClick = {
+                                    scrollToProgress(scope, pagerState)
+                                }
+                            ) {
+                                IconText(
+                                    text = stringResource(R.string.course_review_grading_policy),
+                                    painter = painterResource(id = coreR.drawable.core_ic_mountains),
+                                    color = MaterialTheme.appColors.primary,
+                                    textStyle = MaterialTheme.appTypography.labelLarge
+                                )
+                            }
+                        }
+                    }
+                    var isInternetConnectionShown by rememberSaveable {
+                        mutableStateOf(false)
+                    }
+                    if (!isInternetConnectionShown && !viewModel.hasInternetConnection) {
+                        OfflineModeDialog(
+                            Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.BottomCenter),
+                            onDismissCLick = {
+                                isInternetConnectionShown = true
+                            },
+                            onReloadClick = {
+                                isInternetConnectionShown = viewModel.hasInternetConnection
+                                onRefresh(pagerState.currentPage)
+                            }
+                        )
+                    }
+                }
             }
-
-            val pagerState = rememberPagerState(
-                initialPage = CourseContainerTab.entries.indexOf(requiredTab),
-                pageCount = { CourseContainerTab.entries.size }
-            )
-            val accessStatus = viewModel.courseAccessStatus.observeAsState()
-            val tabState = rememberLazyListState()
-            val snackState = remember { SnackbarHostState() }
-            val pullRefreshState = rememberPullRefreshState(
-                refreshing = refreshing,
-                onRefresh = { onRefresh(pagerState.currentPage) }
-            )
+        ) { paddingValues ->
             if (uiMessage is DatesShiftedSnackBar) {
                 val datesShiftedMessage = stringResource(id = R.string.course_dates_shifted_message)
                 LaunchedEffect(uiMessage) {
@@ -359,14 +410,16 @@ fun CourseDashboard(
                                         windowSize = windowSize,
                                         viewModel = viewModel,
                                         pagerState = pagerState,
-                                        isNavigationEnabled = isNavigationEnabled,
+                                        contentTabPagerState = contentTabPagerState,
                                         isResumed = isResumed,
                                         fragmentManager = fragmentManager,
+                                        onContentTabSelected = { tab ->
+                                            selectedContentTab = tab
+                                        }
                                     )
                                 }
 
-                                else -> {
-                                }
+                                else -> {}
                             }
                         }
                     )
@@ -375,24 +428,6 @@ fun CourseDashboard(
                         pullRefreshState,
                         Modifier.align(Alignment.TopCenter)
                     )
-
-                    var isInternetConnectionShown by rememberSaveable {
-                        mutableStateOf(false)
-                    }
-                    if (!isInternetConnectionShown && !viewModel.hasInternetConnection) {
-                        OfflineModeDialog(
-                            Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.BottomCenter),
-                            onDismissCLick = {
-                                isInternetConnectionShown = true
-                            },
-                            onReloadClick = {
-                                isInternetConnectionShown = viewModel.hasInternetConnection
-                                onRefresh(pagerState.currentPage)
-                            }
-                        )
-                    }
 
                     SnackbarHost(
                         modifier = Modifier.align(Alignment.BottomStart),
@@ -420,37 +455,21 @@ private fun DashboardPager(
     windowSize: WindowSize,
     viewModel: CourseContainerViewModel,
     pagerState: PagerState,
-    isNavigationEnabled: Boolean,
+    contentTabPagerState: PagerState,
     isResumed: Boolean,
     fragmentManager: FragmentManager,
+    onContentTabSelected: (CourseContentTab) -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
+
     HorizontalPager(
         state = pagerState,
-        userScrollEnabled = isNavigationEnabled,
+        userScrollEnabled = false,
         beyondViewportPageCount = CourseContainerTab.entries.size
     ) { page ->
         when (CourseContainerTab.entries[page]) {
             CourseContainerTab.HOME -> {
-                CourseOutlineScreen(
-                    windowSize = windowSize,
-                    viewModel = koinViewModel(
-                        parameters = { parametersOf(viewModel.courseId, viewModel.courseName) }
-                    ),
-                    fragmentManager = fragmentManager,
-                    onResetDatesClick = {
-                        viewModel.onRefresh(CourseContainerTab.DATES)
-                    }
-                )
-            }
-
-            CourseContainerTab.VIDEOS -> {
-                CourseVideosScreen(
-                    windowSize = windowSize,
-                    viewModel = koinViewModel(
-                        parameters = { parametersOf(viewModel.courseId, viewModel.courseName) }
-                    ),
-                    fragmentManager = fragmentManager
-                )
+                // Home tab content will be implemented later
             }
 
             CourseContainerTab.DATES -> {
@@ -516,6 +535,29 @@ private fun DashboardPager(
                             viewModel.courseId,
                             HandoutsType.Announcements
                         )
+                    }
+                )
+            }
+
+            CourseContainerTab.CONTENT -> {
+                ContentTabScreen(
+                    viewModel = koinViewModel(
+                        parameters = { parametersOf(viewModel.courseId, viewModel.courseName) }
+                    ),
+                    windowSize = windowSize,
+                    fragmentManager = fragmentManager,
+                    courseId = viewModel.courseId,
+                    courseName = viewModel.courseName,
+                    pagerState = contentTabPagerState,
+                    onTabSelected = onContentTabSelected,
+                    onNavigateToHome = {
+                        scope.launch {
+                            pagerState.animateScrollToPage(
+                                CourseContainerTab.entries.indexOf(
+                                    CourseContainerTab.HOME
+                                )
+                            )
+                        }
                     }
                 )
             }
@@ -640,5 +682,12 @@ private fun SetupCourseAccessErrorButtons(
 private fun scrollToDates(scope: CoroutineScope, pagerState: PagerState) {
     scope.launch {
         pagerState.animateScrollToPage(CourseContainerTab.entries.indexOf(CourseContainerTab.DATES))
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+private fun scrollToProgress(scope: CoroutineScope, pagerState: PagerState) {
+    scope.launch {
+        pagerState.animateScrollToPage(CourseContainerTab.entries.indexOf(CourseContainerTab.PROGRESS))
     }
 }
