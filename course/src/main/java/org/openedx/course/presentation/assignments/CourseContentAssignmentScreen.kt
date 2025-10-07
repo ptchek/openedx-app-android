@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Card
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Divider
@@ -56,7 +58,6 @@ import org.openedx.core.domain.model.Block
 import org.openedx.core.domain.model.BlockCounts
 import org.openedx.core.domain.model.CourseProgress
 import org.openedx.core.domain.model.Progress
-import org.openedx.core.presentation.course.CourseViewMode
 import org.openedx.core.ui.theme.OpenEdXTheme
 import org.openedx.core.ui.theme.appColors
 import org.openedx.core.ui.theme.appShapes
@@ -65,6 +66,7 @@ import org.openedx.core.utils.TimeUtils
 import org.openedx.course.R
 import org.openedx.course.presentation.contenttab.CourseContentAssignmentEmptyState
 import org.openedx.course.presentation.ui.CourseProgress
+import org.openedx.course.presentation.unit.container.CourseViewMode
 import org.openedx.foundation.presentation.WindowSize
 import org.openedx.foundation.presentation.WindowType
 import org.openedx.foundation.presentation.windowSizeValue
@@ -132,6 +134,7 @@ private fun CourseContentAssignmentScreen(
 
         is CourseAssignmentUIState.Empty -> {
             CourseContentAssignmentEmptyState(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
                 onReturnToCourseClick = onNavigateToHome
             )
         }
@@ -145,7 +148,7 @@ private fun CourseContentAssignmentScreen(
             ) {
                 val progress = uiState.progress
                 val description = stringResource(
-                    id = R.string.course_completed,
+                    id = R.string.course_completed_of,
                     progress.completed,
                     progress.total
                 )
@@ -265,7 +268,7 @@ private fun AssignmentGroupSection(
         if (isCompletedShown || progress.value != 1f) {
             if (assignments.size > 1) {
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.padding(vertical = 8.dp),
                     contentPadding = PaddingValues(horizontal = 24.dp)
                 ) {
@@ -274,11 +277,7 @@ private fun AssignmentGroupSection(
                             assignment = assignment,
                             isSelected = assignment.id == selectedId,
                             onClick = {
-                                selectedId = if (selectedId == assignment.id) {
-                                    null
-                                } else {
-                                    assignment.id
-                                }
+                                selectedId = assignment.id
                             }
                         )
                     }
@@ -300,7 +299,7 @@ private fun AssignmentGroupSection(
                 AssignmentDetails(
                     modifier = Modifier
                         .padding(horizontal = 24.dp)
-                        .padding(top = 8.dp),
+                        .padding(top = 12.dp),
                     assignment = assignment,
                     sectionName = sectionNames[assignment.id] ?: "",
                     onAssignmentClick = onAssignmentClick
@@ -426,7 +425,7 @@ private fun AssignmentDetails(
     val color = when {
         assignment.isCompleted() -> MaterialTheme.appColors.successGreen
         isDuePast -> MaterialTheme.appColors.warning
-        else -> MaterialTheme.appColors.cardViewBorder
+        else -> MaterialTheme.appColors.assignmentCardBorder
     }
     val label = assignment.assignmentProgress?.label
     val description = when {
@@ -492,12 +491,14 @@ private fun AssignmentDetails(
                         color = MaterialTheme.appColors.textDark
                     )
                     Text(
+                        modifier = Modifier.padding(top = 4.dp),
                         text = assignment.displayName,
                         style = MaterialTheme.appTypography.bodyLarge,
                         color = MaterialTheme.appColors.textDark
                     )
                     if (description.isNotEmpty()) {
                         Text(
+                            modifier = Modifier.padding(top = 6.dp),
                             text = description,
                             style = MaterialTheme.appTypography.bodySmall,
                             color = MaterialTheme.appColors.textDark

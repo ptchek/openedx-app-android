@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,6 +51,7 @@ import androidx.compose.material.Snackbar
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
@@ -77,6 +79,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -103,6 +106,7 @@ import org.openedx.core.ui.BackBtn
 import org.openedx.core.ui.IconText
 import org.openedx.core.ui.OpenEdXButton
 import org.openedx.core.ui.OpenEdXOutlinedButton
+import org.openedx.core.ui.TextIcon
 import org.openedx.core.ui.displayCutoutForLandscape
 import org.openedx.core.ui.noRippleClickable
 import org.openedx.core.ui.theme.OpenEdXTheme
@@ -614,7 +618,7 @@ fun CourseVideoSection(
     block: Block,
     videoBlocks: List<Block>,
     preview: Map<String, VideoPreview?>,
-    progress: Map<String, Float>,
+    progress: Map<String, Float?>,
     downloadedStateMap: Map<String, DownloadedState>,
     onVideoClick: (Block) -> Unit,
     onDownloadClick: (blocksIds: List<String>) -> Unit,
@@ -628,6 +632,8 @@ fun CourseVideoSection(
         filteredStatuses.any { it.isWaitingOrDownloading } -> DownloadedState.DOWNLOADING
         else -> DownloadedState.NOT_DOWNLOADED
     }
+    val videoCardWidth = 192.dp
+    val rowHorizontalArrangement = 8.dp
 
     LaunchedEffect(Unit) {
         try {
@@ -651,19 +657,29 @@ fun CourseVideoSection(
         )
         LazyRow(
             state = state,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(rowHorizontalArrangement),
             contentPadding = PaddingValues(
                 top = 8.dp,
                 bottom = 16.dp,
                 start = 16.dp,
-                end = 16.dp,
+                end = videoCardWidth + rowHorizontalArrangement,
             )
         ) {
             items(videoBlocks) { block ->
+                val localProgress = progress[block.id]
+                val progress = localProgress ?: if (block.isCompleted()) {
+                    1f
+                } else {
+                    0f
+                }
                 CourseVideoItem(
+                    modifier = Modifier
+                        .width(videoCardWidth)
+                        .height(108.dp)
+                        .clip(MaterialTheme.appShapes.videoPreviewShape),
                     videoBlock = block,
                     preview = preview[block.id],
-                    progress = progress[block.id] ?: 0f,
+                    progress = progress,
                     onClick = {
                         onVideoClick(block)
                     }
@@ -676,16 +692,17 @@ fun CourseVideoSection(
 
 @Composable
 fun CourseVideoItem(
+    modifier: Modifier = Modifier,
     videoBlock: Block,
     preview: VideoPreview?,
     progress: Float,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    titleStyle: TextStyle = MaterialTheme.appTypography.bodySmall,
+    contentModifier: Modifier = Modifier.padding(8.dp),
+    progressModifier: Modifier = Modifier.height(4.dp),
 ) {
     Box(
-        modifier = Modifier
-            .width(192.dp)
-            .height(108.dp)
-            .clip(MaterialTheme.appShapes.videoPreviewShape)
+        modifier = modifier
             .let {
                 if (videoBlock.isCompleted()) {
                     it.border(
@@ -726,57 +743,64 @@ fun CourseVideoItem(
                 )
         )
 
-        Image(
-            modifier = Modifier
-                .size(32.dp)
-                .align(Alignment.Center),
-            painter = painterResource(id = R.drawable.course_video_play_button),
-            contentDescription = null,
-        )
+        Box(
+            modifier = contentModifier.fillMaxSize()
+        ) {
+            Image(
+                modifier = Modifier
+                    .size(32.dp)
+                    .align(Alignment.Center),
+                painter = painterResource(id = R.drawable.course_video_play_button),
+                contentDescription = null,
+            )
 
-        // Title (top-left)
-        Text(
-            text = videoBlock.displayName,
-            color = Color.White,
-            style = MaterialTheme.appTypography.bodySmall,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(8.dp),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+            // Title (top-left)
+            Text(
+                text = videoBlock.displayName,
+                color = Color.White,
+                style = titleStyle,
+                modifier = Modifier
+                    .align(Alignment.TopStart),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
 
-        // Progress bar (bottom)
-        if (progress > 0.0f) {
+            // Progress bar (bottom)
             Box(
                 modifier = Modifier
-                    .padding(bottom = 4.dp)
-                    .height(16.dp)
+                    .fillMaxWidth()
                     .align(Alignment.BottomCenter),
                 contentAlignment = Alignment.Center
             ) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .padding(horizontal = 8.dp)
-                        .clip(CircleShape),
-                    progress = progress,
-                    color = if (videoBlock.isCompleted() && progress > 0.95f) {
-                        MaterialTheme.appColors.progressBarColor
-                    } else {
-                        MaterialTheme.appColors.primary
-                    },
-                    backgroundColor = MaterialTheme.appColors.progressBarBackgroundColor
-                )
+                if (progress > 0.0f) {
+                    LinearProgressIndicator(
+                        modifier = progressModifier
+                            .fillMaxWidth()
+                            .clip(CircleShape),
+                        progress = progress,
+                        color = if (videoBlock.isCompleted() && progress > 0.95f) {
+                            MaterialTheme.appColors.progressBarColor
+                        } else {
+                            MaterialTheme.appColors.info
+                        },
+                        backgroundColor = MaterialTheme.appColors.progressBarBackgroundColor
+                    )
+                }
                 if (videoBlock.isCompleted()) {
                     Image(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .size(16.dp)
-                            .offset(x = (-4).dp),
+                            .offset(x = 1.dp),
                         painter = painterResource(id = coreR.drawable.ic_core_check),
                         contentDescription = stringResource(R.string.course_accessibility_video_watched),
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .size(16.dp)
+                            .offset(x = 1.dp),
                     )
                 }
             }
@@ -850,7 +874,7 @@ fun DownloadIcon(
             val downloadIconTint = if (downloadedState == DownloadedState.DOWNLOADED) {
                 MaterialTheme.appColors.successGreen
             } else {
-                MaterialTheme.appColors.textAccent
+                MaterialTheme.appColors.primary
             }
             IconButton(
                 modifier = iconModifier,
@@ -900,14 +924,18 @@ fun DownloadIcon(
 @Composable
 fun CourseSection(
     modifier: Modifier = Modifier,
-    block: Block,
+    section: Block,
     useRelativeDates: Boolean,
+    showDueDate: Boolean = true,
+    isExpandable: Boolean = true,
     onItemClick: (Block) -> Unit,
     isSectionVisible: Boolean?,
-    courseSubSections: List<Block>?,
+    subSections: List<Block>?,
     downloadedStateMap: Map<String, DownloadedState>,
     onSubSectionClick: (Block) -> Unit,
     onDownloadClick: (blocksIds: List<String>) -> Unit,
+    progress: Float? = null,
+    background: Color = MaterialTheme.appColors.cardViewBackground
 ) {
     val arrowRotation by animateFloatAsState(
         targetValue = if (isSectionVisible == true) {
@@ -917,7 +945,7 @@ fun CourseSection(
         },
         label = ""
     )
-    val subSectionIds = courseSubSections?.map { it.id }.orEmpty()
+    val subSectionIds = subSections?.map { it.id }.orEmpty()
     val filteredStatuses = downloadedStateMap.filterKeys { it in subSectionIds }.values
     val downloadedState = when {
         filteredStatuses.isEmpty() -> null
@@ -927,15 +955,15 @@ fun CourseSection(
     }
 
     // Section progress
-    val completedCount = courseSubSections?.count { it.isCompleted() } ?: 0
-    val totalCount = courseSubSections?.size ?: 0
-    val progress = if (totalCount > 0) completedCount.toFloat() / totalCount else 0f
+    val completedCount = subSections?.count { it.isCompleted() } ?: 0
+    val totalCount = subSections?.size ?: 0
+    val progress = progress ?: if (totalCount > 0) completedCount.toFloat() / totalCount else 0f
 
     Column(
         modifier = modifier
             .clip(MaterialTheme.appShapes.sectionCardShape)
-            .noRippleClickable { onItemClick(block) }
-            .background(MaterialTheme.appColors.cardViewBackground)
+            .noRippleClickable { onItemClick(section) }
+            .background(background)
             .border(
                 1.dp,
                 MaterialTheme.appColors.cardViewBorder,
@@ -951,20 +979,22 @@ fun CourseSection(
             backgroundColor = MaterialTheme.appColors.progressBarBackgroundColor
         )
         CourseExpandableChapterCard(
-            block = block,
+            block = section,
             arrowDegrees = arrowRotation,
+            isExpandable = isExpandable,
             downloadedState = downloadedState,
             onDownloadClick = {
-                onDownloadClick(block.descendants)
+                onDownloadClick(section.descendants)
             }
         )
-        courseSubSections?.forEach { subSectionBlock ->
+        subSections?.forEach { subSectionBlock ->
             AnimatedVisibility(
                 visible = isSectionVisible == true
             ) {
                 CourseSubSectionItem(
                     block = subSectionBlock,
                     onClick = onSubSectionClick,
+                    showDueDate = showDueDate,
                     useRelativeDates = useRelativeDates
                 )
             }
@@ -977,6 +1007,7 @@ fun CourseExpandableChapterCard(
     modifier: Modifier = Modifier,
     block: Block,
     arrowDegrees: Float = 0f,
+    isExpandable: Boolean = true,
     downloadedState: DownloadedState?,
     onDownloadClick: () -> Unit,
 ) {
@@ -989,7 +1020,9 @@ fun CourseExpandableChapterCard(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        CardArrow(degrees = arrowDegrees)
+        if (isExpandable) {
+            CardArrow(degrees = arrowDegrees)
+        }
         if (block.isCompleted()) {
             val completedIconPainter = painterResource(R.drawable.course_ic_task_alt)
             val completedIconColor = MaterialTheme.appColors.successGreen
@@ -1005,7 +1038,7 @@ fun CourseExpandableChapterCard(
         Text(
             modifier = Modifier.weight(1f),
             text = block.displayName,
-            style = MaterialTheme.appTypography.titleSmall,
+            style = MaterialTheme.appTypography.titleMedium,
             color = MaterialTheme.appColors.textPrimary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -1022,6 +1055,7 @@ fun CourseSubSectionItem(
     modifier: Modifier = Modifier,
     block: Block,
     useRelativeDates: Boolean,
+    showDueDate: Boolean,
     onClick: (Block) -> Unit,
 ) {
     val context = LocalContext.current
@@ -1065,7 +1099,7 @@ fun CourseSubSectionItem(
                 maxLines = 1
             )
             Spacer(modifier = Modifier.width(16.dp))
-            if (due != null) {
+            if (due != null || showDueDate) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     tint = MaterialTheme.appColors.onSurface,
@@ -1093,7 +1127,7 @@ fun CourseSubSectionItem(
             .filter { !it.isNullOrEmpty() }
             .joinToString(" - ")
 
-        if (assignmentString.isNotEmpty()) {
+        if (assignmentString.isNotEmpty() && showDueDate) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = assignmentString,
@@ -1536,6 +1570,44 @@ fun CourseProgress(
             }
         }
     }
+}
+
+@Composable
+fun ResumeCourseButton(
+    modifier: Modifier = Modifier,
+    block: Block,
+    displayName: String,
+    onResumeClick: (String) -> Unit,
+) {
+    OpenEdXButton(
+        modifier = modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 54.dp),
+        onClick = {
+            onResumeClick(block.id)
+        },
+        content = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    modifier = Modifier.weight(1f),
+                    text = displayName,
+                    color = MaterialTheme.appColors.primaryButtonText,
+                    style = MaterialTheme.appTypography.titleMedium,
+                    fontWeight = FontWeight.W600
+                )
+                TextIcon(
+                    text = stringResource(id = R.string.course_continue),
+                    icon = Icons.AutoMirrored.Filled.ArrowForward,
+                    color = MaterialTheme.appColors.primaryButtonText,
+                    textStyle = MaterialTheme.appTypography.labelLarge
+                )
+            }
+        }
+    )
 }
 
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_NO)

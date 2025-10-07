@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Scaffold
@@ -35,7 +37,6 @@ import org.openedx.core.domain.model.CourseStructure
 import org.openedx.core.domain.model.CoursewareAccess
 import org.openedx.core.domain.model.Progress
 import org.openedx.core.module.download.DownloadModelsSize
-import org.openedx.core.presentation.course.CourseViewMode
 import org.openedx.core.ui.CircularProgress
 import org.openedx.core.ui.HandleUIMessage
 import org.openedx.core.ui.displayCutoutForLandscape
@@ -45,6 +46,7 @@ import org.openedx.course.R
 import org.openedx.course.presentation.contenttab.CourseContentVideoEmptyState
 import org.openedx.course.presentation.ui.CourseProgress
 import org.openedx.course.presentation.ui.CourseVideoSection
+import org.openedx.course.presentation.unit.container.CourseViewMode
 import org.openedx.foundation.presentation.UIMessage
 import org.openedx.foundation.presentation.WindowSize
 import org.openedx.foundation.presentation.WindowType
@@ -142,6 +144,7 @@ private fun CourseVideosUI(
                         when (uiState) {
                             is CourseVideoUIState.Empty -> {
                                 CourseContentVideoEmptyState(
+                                    modifier = Modifier.verticalScroll(rememberScrollState()),
                                     onReturnToCourseClick = onNavigateToHome
                                 )
                             }
@@ -179,7 +182,7 @@ private fun CourseVideosUI(
                                                 null
                                             },
                                             description = stringResource(
-                                                R.string.course_completed,
+                                                R.string.course_completed_of,
                                                 progress.completed,
                                                 progress.total
                                             )
