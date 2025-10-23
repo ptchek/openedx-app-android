@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.viewModelScope
 import androidx.media3.cast.CastPlayer
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
@@ -19,6 +20,8 @@ import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.extractor.DefaultExtractorsFactory
 import com.google.android.gms.cast.framework.CastContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.openedx.core.data.storage.CorePreferences
 import org.openedx.core.domain.model.VideoQuality
 import org.openedx.core.module.TranscriptManager
@@ -32,7 +35,8 @@ import java.util.concurrent.Executors
 @SuppressLint("StaticFieldLeak")
 class EncodedVideoUnitViewModel(
     courseId: String,
-    val blockId: String,
+    videoUrl: String,
+    blockId: String,
     private val context: Context,
     private val preferencesManager: CorePreferences,
     courseRepository: CourseRepository,
@@ -42,6 +46,8 @@ class EncodedVideoUnitViewModel(
     courseAnalytics: CourseAnalytics,
 ) : VideoUnitViewModel(
     courseId,
+    videoUrl,
+    blockId,
     courseRepository,
     notifier,
     networkConnection,
@@ -65,6 +71,16 @@ class EncodedVideoUnitViewModel(
     var isPlayerSetUp = false
 
     private val exoPlayerListener = object : Player.Listener {
+        override fun onRenderedFirstFrame() {
+            super.onRenderedFirstFrame()
+            viewModelScope.launch {
+                while (exoPlayer?.duration == null || exoPlayer?.duration!! < 0f) {
+                    delay(500)
+                }
+                duration = exoPlayer?.duration ?: 0L
+            }
+        }
+
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             super.onPlayWhenReadyChanged(playWhenReady, reason)
             isPlaying = playWhenReady
@@ -106,6 +122,7 @@ class EncodedVideoUnitViewModel(
         CastContext.getSharedInstance(context, executor).addOnCompleteListener {
             it.result?.let { castContext ->
                 castPlayer = CastPlayer(castContext)
+                isUpdatedMutable.value = true
             }
         }
     }

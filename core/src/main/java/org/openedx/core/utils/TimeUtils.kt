@@ -20,11 +20,12 @@ object TimeUtils {
 
     private const val FORMAT_ISO_8601 = "yyyy-MM-dd'T'HH:mm:ss'Z'"
     private const val FORMAT_ISO_8601_WITH_TIME_ZONE = "yyyy-MM-dd'T'HH:mm:ssXXX"
+    private const val FORMAT_MONTH_DAY = "MMM dd"
     private const val SEVEN_DAYS_IN_MILLIS = 604800000L
 
     fun formatToString(context: Context, date: Date, useRelativeDates: Boolean): String {
         if (!useRelativeDates) {
-            val locale = Locale(Locale.getDefault().language)
+            val locale = Locale.Builder().setLanguage(Locale.getDefault().language).build()
             val dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, locale)
             return dateFormat.format(date)
         }
@@ -76,6 +77,30 @@ object TimeUtils {
                 ).toString()
             }
         }
+    }
+    fun formatToDueInString(context: Context, date: Date): String {
+        val now = Calendar.getInstance()
+        val dueDate = Calendar.getInstance().apply { time = date }
+        now.set(Calendar.HOUR_OF_DAY, 0)
+        now.set(Calendar.MINUTE, 0)
+        now.set(Calendar.SECOND, 0)
+        now.set(Calendar.MILLISECOND, 0)
+        dueDate.set(Calendar.HOUR_OF_DAY, 0)
+        dueDate.set(Calendar.MINUTE, 0)
+        dueDate.set(Calendar.SECOND, 0)
+        dueDate.set(Calendar.MILLISECOND, 0)
+        val daysDifference =
+            ((dueDate.timeInMillis - now.timeInMillis) / (24 * 60 * 60 * 1000)).toInt()
+        return when {
+            daysDifference < 0 -> context.getString(R.string.core_date_type_past_due)
+            daysDifference == 0 -> context.getString(R.string.core_date_type_today)
+            else -> context.getString(R.string.core_date_format_due_in_days, daysDifference)
+        }
+    }
+
+    fun formatToMonthDay(date: Date): String {
+        val sdf = SimpleDateFormat(FORMAT_MONTH_DAY, Locale.getDefault())
+        return sdf.format(date)
     }
 
     fun getCurrentTime(): Long {

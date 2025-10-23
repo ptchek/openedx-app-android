@@ -58,7 +58,6 @@ import org.openedx.core.BlockType
 import org.openedx.core.domain.model.AssignmentProgress
 import org.openedx.core.domain.model.Block
 import org.openedx.core.domain.model.BlockCounts
-import org.openedx.core.presentation.course.CourseViewMode
 import org.openedx.core.ui.BackBtn
 import org.openedx.core.ui.HandleUIMessage
 import org.openedx.core.ui.displayCutoutForLandscape
@@ -70,6 +69,7 @@ import org.openedx.core.ui.theme.appTypography
 import org.openedx.course.R
 import org.openedx.course.presentation.CourseRouter
 import org.openedx.course.presentation.ui.CardArrow
+import org.openedx.course.presentation.unit.container.CourseViewMode
 import org.openedx.foundation.extension.serializable
 import org.openedx.foundation.presentation.UIMessage
 import org.openedx.foundation.presentation.WindowSize
@@ -290,7 +290,7 @@ private fun CourseSubsectionItem(
             painterResource(R.drawable.course_ic_task_alt)
         } else {
             painterResource(
-                CoreR.drawable.ic_core_chapter_icon
+                CoreR.drawable.core_ic_chapter_icon
             )
         }
     val completedIconColor =
@@ -405,7 +405,7 @@ private val mockBlock = Block(
     descendantsType = BlockType.HTML,
     completion = 0.0,
     containsGatedContent = false,
-    assignmentProgress = AssignmentProgress("", 1f, 2f),
+    assignmentProgress = AssignmentProgress("", 1f, 2f, "HM1"),
     due = Date(),
     offlineDownload = null
 )

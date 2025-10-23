@@ -3,10 +3,10 @@ package org.openedx.course.presentation.container
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import android.os.Build
+import androidx.core.graphics.createBitmap
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,9 +14,10 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import org.openedx.core.config.Config
 import org.openedx.core.data.storage.CorePreferences
 import org.openedx.core.domain.model.CourseAccessError
@@ -35,9 +36,11 @@ import org.openedx.core.system.notifier.CourseDatesShifted
 import org.openedx.core.system.notifier.CourseLoading
 import org.openedx.core.system.notifier.CourseNotifier
 import org.openedx.core.system.notifier.CourseOpenBlock
+import org.openedx.core.system.notifier.CourseStructureGot
 import org.openedx.core.system.notifier.CourseStructureUpdated
 import org.openedx.core.system.notifier.RefreshDates
 import org.openedx.core.system.notifier.RefreshDiscussions
+import org.openedx.core.system.notifier.RefreshProgress
 import org.openedx.core.worker.CalendarSyncScheduler
 import org.openedx.course.DatesShiftedSnackBar
 import org.openedx.course.domain.interactor.CourseInteractor
@@ -116,7 +119,7 @@ class CourseContainerViewModel(
     val calendarSyncUIState: StateFlow<CalendarSyncUIState> =
         _calendarSyncUIState.asStateFlow()
 
-    private var _courseImage = MutableStateFlow(Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888))
+    private var _courseImage = MutableStateFlow(createBitmap(1, 1))
     val courseImage: StateFlow<Bitmap> = _courseImage.asStateFlow()
 
     val hasInternetConnection: Boolean
@@ -170,45 +173,26 @@ class CourseContainerViewModel(
         _showProgress.value = true
 
         viewModelScope.launch {
-            try {
-                val (courseStructure, courseEnrollmentDetails) = fetchCourseData(courseId)
-                _showProgress.value = false
-                when {
-                    courseEnrollmentDetails != null -> {
-                        handleCourseEnrollment(courseEnrollmentDetails)
-                    }
-
-                    courseStructure != null -> {
-                        handleCourseStructureOnly(courseStructure)
-                    }
-
-                    else -> {
-                        _courseAccessStatus.value = CourseAccessError.UNKNOWN
-                    }
+            val courseStructureFlow = interactor.getCourseStructureFlow(courseId)
+                .catch { e ->
+                    handleFetchError(e)
+                    emit(null)
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
+            val courseDetailsFlow = interactor.getEnrollmentDetailsFlow(courseId)
+                .catch { emit(null) }
+            courseStructureFlow.combine(courseDetailsFlow) { courseStructure, courseEnrollmentDetails ->
+                courseStructure to courseEnrollmentDetails
+            }.catch { e ->
                 handleFetchError(e)
-                _showProgress.value = false
+            }.collect { (courseStructure, courseEnrollmentDetails) ->
+                when {
+                    courseEnrollmentDetails != null -> handleCourseEnrollment(courseEnrollmentDetails)
+                    courseStructure != null -> handleCourseStructureOnly(courseStructure)
+                    else -> _courseAccessStatus.value = CourseAccessError.UNKNOWN
+                }
+                courseNotifier.send(CourseStructureGot(courseId))
             }
         }
-    }
-
-    private suspend fun fetchCourseData(
-        courseId: String
-    ): Pair<CourseStructure?, CourseEnrollmentDetails?> = supervisorScope {
-        val deferredCourse = async {
-            runCatching {
-                interactor.getCourseStructure(courseId, isNeedRefresh = true)
-            }.getOrNull()
-        }
-        val deferredEnrollment = async {
-            runCatching {
-                interactor.getEnrollmentDetails(courseId)
-            }.getOrNull()
-        }
-
-        Pair(deferredCourse.await(), deferredEnrollment.await())
     }
 
     /**
@@ -262,15 +246,17 @@ class CourseContainerViewModel(
         _dataReady.value = true
     }
 
-    private fun handleFetchError(e: Exception) {
+    private fun handleFetchError(e: Throwable) {
+        e.printStackTrace()
         if (isNetworkRelatedError(e)) {
             _errorMessage.value = resourceManager.getString(CoreR.string.core_error_no_connection)
         } else {
             _courseAccessStatus.value = CourseAccessError.UNKNOWN
         }
+        _showProgress.value = false
     }
 
-    private fun isNetworkRelatedError(e: Exception): Boolean {
+    private fun isNetworkRelatedError(e: Throwable): Boolean {
         return e.isInternetError() || e is NoCachedDataException
     }
 
@@ -298,7 +284,7 @@ class CourseContainerViewModel(
                 updateData()
             }
 
-            CourseContainerTab.VIDEOS -> {
+            CourseContainerTab.CONTENT -> {
                 updateData()
             }
 
@@ -318,6 +304,12 @@ class CourseContainerViewModel(
                 }
             }
 
+            CourseContainerTab.PROGRESS -> {
+                viewModelScope.launch {
+                    courseNotifier.send(RefreshProgress)
+                }
+            }
+
             else -> {
                 _refreshing.value = false
             }
@@ -328,7 +320,7 @@ class CourseContainerViewModel(
         viewModelScope.launch {
             try {
                 interactor.getCourseStructure(courseId, isNeedRefresh = true)
-            } catch (ignore: Exception) {
+            } catch (_: Exception) {
                 _errorMessage.value =
                     resourceManager.getString(CoreR.string.core_error_unknown_error)
             }
@@ -340,11 +332,12 @@ class CourseContainerViewModel(
     fun courseContainerTabClickedEvent(index: Int) {
         when (CourseContainerTab.entries[index]) {
             CourseContainerTab.HOME -> courseTabClickedEvent()
-            CourseContainerTab.VIDEOS -> videoTabClickedEvent()
             CourseContainerTab.DISCUSSIONS -> discussionTabClickedEvent()
             CourseContainerTab.DATES -> datesTabClickedEvent()
+            CourseContainerTab.PROGRESS -> progressTabClickedEvent()
             CourseContainerTab.MORE -> moreTabClickedEvent()
-            CourseContainerTab.OFFLINE -> {}
+            CourseContainerTab.OFFLINE -> offlineTabClickedEvent()
+            CourseContainerTab.CONTENT -> contentTabClickedEvent()
         }
     }
 
@@ -380,10 +373,6 @@ class CourseContainerViewModel(
         logCourseContainerEvent(CourseAnalyticsEvent.HOME_TAB)
     }
 
-    private fun videoTabClickedEvent() {
-        logCourseContainerEvent(CourseAnalyticsEvent.VIDEOS_TAB)
-    }
-
     private fun discussionTabClickedEvent() {
         logCourseContainerEvent(CourseAnalyticsEvent.DISCUSSION_TAB)
     }
@@ -396,6 +385,17 @@ class CourseContainerViewModel(
         logCourseContainerEvent(CourseAnalyticsEvent.MORE_TAB)
     }
 
+    private fun progressTabClickedEvent() {
+        logCourseContainerEvent(CourseAnalyticsEvent.PROGRESS_TAB)
+    }
+
+    private fun offlineTabClickedEvent() {
+        logCourseContainerEvent(CourseAnalyticsEvent.OFFLINE_TAB)
+    }
+
+    private fun contentTabClickedEvent() {
+        logCourseContainerEvent(CourseAnalyticsEvent.CONTENT_TAB)
+    }
     private fun logCourseContainerEvent(event: CourseAnalyticsEvent) {
         courseAnalytics.logScreenEvent(
             screenName = event.eventName,

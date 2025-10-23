@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import org.openedx.core.BlockType
 import org.openedx.core.data.storage.CorePreferences
 import org.openedx.core.domain.model.Block
+import org.openedx.core.extension.safeDivBy
 import org.openedx.core.module.DownloadWorkerController
 import org.openedx.core.module.db.DownloadDao
 import org.openedx.core.module.db.DownloadModel
@@ -21,10 +22,12 @@ import org.openedx.core.module.db.FileType
 import org.openedx.core.module.download.BaseDownloadViewModel
 import org.openedx.core.module.download.DownloadHelper
 import org.openedx.core.presentation.CoreAnalytics
+import org.openedx.core.presentation.dialog.downloaddialog.DownloadDialogItem
+import org.openedx.core.presentation.dialog.downloaddialog.DownloadDialogManager
 import org.openedx.core.system.connection.NetworkConnection
+import org.openedx.core.system.notifier.CourseNotifier
+import org.openedx.core.system.notifier.CourseStructureGot
 import org.openedx.course.domain.interactor.CourseInteractor
-import org.openedx.course.presentation.download.DownloadDialogItem
-import org.openedx.course.presentation.download.DownloadDialogManager
 import org.openedx.foundation.extension.toFileSize
 import org.openedx.foundation.utils.FileUtil
 
@@ -36,12 +39,12 @@ class CourseOfflineViewModel(
     private val downloadDialogManager: DownloadDialogManager,
     private val fileUtil: FileUtil,
     private val networkConnection: NetworkConnection,
+    private val courseNotifier: CourseNotifier,
     coreAnalytics: CoreAnalytics,
     downloadDao: DownloadDao,
     workerController: DownloadWorkerController,
     downloadHelper: DownloadHelper,
 ) : BaseDownloadViewModel(
-    courseId,
     downloadDao,
     preferencesManager,
     workerController,
@@ -71,11 +74,7 @@ class CourseOfflineViewModel(
                 _uiState.update { it.copy(isDownloading = isDownloading) }
             }
         }
-
-        viewModelScope.launch {
-            async { initDownloadFragment() }.await()
-            getOfflineData()
-        }
+        collectCourseNotifier()
     }
 
     fun downloadAllBlocks(fragmentManager: FragmentManager) {
@@ -100,7 +99,7 @@ class CourseOfflineViewModel(
                 fragmentManager = fragmentManager,
                 removeDownloadModels = ::removeDownloadModels,
                 saveDownloadModels = { blockId ->
-                    saveDownloadModels(fileUtil.getExternalAppDir().path, blockId)
+                    saveDownloadModels(fileUtil.getExternalAppDir().path, courseId, blockId)
                 }
             )
         }
@@ -127,12 +126,12 @@ class CourseOfflineViewModel(
 
     fun deleteAll(fragmentManager: FragmentManager) {
         viewModelScope.launch {
-            val downloadModels = courseInteractor.getAllDownloadModels().filter { it.courseId == courseId }
+            val downloadModels =
+                courseInteractor.getAllDownloadModels().filter { it.courseId == courseId }
             val totalSize = downloadModels.sumOf { it.size }
             val downloadDialogItem = DownloadDialogItem(
                 title = courseTitle,
                 size = totalSize,
-                icon = Icons.AutoMirrored.Outlined.InsertDriveFile
             )
             downloadDialogManager.showRemoveDownloadModelPopup(
                 downloadDialogItem = downloadDialogItem,
@@ -171,7 +170,8 @@ class CourseOfflineViewModel(
                 val completedDownloads =
                     downloadModels.filter { it.downloadedState.isDownloaded && it.courseId == courseId }
                 val completedDownloadIds = completedDownloads.map { it.id }
-                val downloadedBlocks = courseStructure.blockData.filter { it.id in completedDownloadIds }
+                val downloadedBlocks =
+                    courseStructure.blockData.filter { it.id in completedDownloadIds }
 
                 updateUIState(
                     totalDownloadableSize,
@@ -187,19 +187,24 @@ class CourseOfflineViewModel(
         completedDownloads: List<DownloadModel>,
         downloadedBlocks: List<Block>
     ) {
-        val downloadedSize = getFilesSize(downloadedBlocks)
+        val downloadedSize = getFilesSize(downloadedBlocks).toFloat()
         val realDownloadedSize = completedDownloads.sumOf { it.size }
         val largestDownloads = completedDownloads
             .sortedByDescending { it.size }
             .take(n = 5)
-
+        val progressBarValue = downloadedSize.safeDivBy(totalDownloadableSize.toFloat())
+        val readyToDownloadSize = if (progressBarValue >= 1) {
+            0
+        } else {
+            totalDownloadableSize - realDownloadedSize
+        }
         _uiState.update {
             it.copy(
                 isHaveDownloadableBlocks = true,
                 largestDownloads = largestDownloads,
-                readyToDownloadSize = (totalDownloadableSize - downloadedSize).toFileSize(1, false),
+                readyToDownloadSize = readyToDownloadSize.toFileSize(1, false),
                 downloadedSize = realDownloadedSize.toFileSize(1, false),
-                progressBarValue = downloadedSize.toFloat() / totalDownloadableSize.toFloat()
+                progressBarValue = progressBarValue
             )
         }
     }
@@ -215,6 +220,19 @@ class CourseOfflineViewModel(
 
                 FileType.X_BLOCK -> it.offlineDownload?.fileSize ?: 0
                 else -> 0
+            }
+        }
+    }
+
+    private fun collectCourseNotifier() {
+        viewModelScope.launch {
+            courseNotifier.notifier.collect { event ->
+                when (event) {
+                    is CourseStructureGot -> {
+                        async { initDownloadFragment() }.await()
+                        getOfflineData()
+                    }
+                }
             }
         }
     }

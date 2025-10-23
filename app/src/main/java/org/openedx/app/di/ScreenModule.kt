@@ -18,13 +18,18 @@ import org.openedx.core.presentation.settings.video.VideoQualityViewModel
 import org.openedx.core.repository.CalendarRepository
 import org.openedx.course.data.repository.CourseRepository
 import org.openedx.course.domain.interactor.CourseInteractor
+import org.openedx.course.presentation.assignments.CourseAssignmentViewModel
 import org.openedx.course.presentation.container.CourseContainerViewModel
+import org.openedx.course.presentation.contenttab.ContentTabViewModel
 import org.openedx.course.presentation.dates.CourseDatesViewModel
 import org.openedx.course.presentation.handouts.HandoutsViewModel
+import org.openedx.course.presentation.home.CourseHomeViewModel
 import org.openedx.course.presentation.offline.CourseOfflineViewModel
-import org.openedx.course.presentation.outline.CourseOutlineViewModel
+import org.openedx.course.presentation.outline.CourseContentAllViewModel
+import org.openedx.course.presentation.progress.CourseProgressViewModel
 import org.openedx.course.presentation.section.CourseSectionViewModel
 import org.openedx.course.presentation.unit.container.CourseUnitContainerViewModel
+import org.openedx.course.presentation.unit.container.CourseViewMode
 import org.openedx.course.presentation.unit.html.HtmlUnitViewModel
 import org.openedx.course.presentation.unit.video.BaseVideoViewModel
 import org.openedx.course.presentation.unit.video.EncodedVideoUnitViewModel
@@ -54,6 +59,9 @@ import org.openedx.discussion.presentation.search.DiscussionSearchThreadViewMode
 import org.openedx.discussion.presentation.threads.DiscussionAddThreadViewModel
 import org.openedx.discussion.presentation.threads.DiscussionThreadsViewModel
 import org.openedx.discussion.presentation.topics.DiscussionTopicsViewModel
+import org.openedx.downloads.data.repository.DownloadRepository
+import org.openedx.downloads.domain.interactor.DownloadInteractor
+import org.openedx.downloads.presentation.download.DownloadsViewModel
 import org.openedx.foundation.presentation.WindowSize
 import org.openedx.learn.presentation.LearnViewModel
 import org.openedx.profile.data.repository.ProfileRepository
@@ -88,7 +96,7 @@ val screenModule = module {
             get(),
         )
     }
-    viewModel { MainViewModel(get(), get(), get()) }
+    viewModel { MainViewModel(get(), get(), get(), get()) }
 
     factory { AuthRepository(get(), get(), get()) }
     factory { AuthInteractor(get()) }
@@ -145,7 +153,7 @@ val screenModule = module {
 
     factory { DashboardRepository(get(), get(), get(), get()) }
     factory { DashboardInteractor(get()) }
-    viewModel { DashboardListViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { DashboardListViewModel(get(), get(), get(), get(), get(), get()) }
     viewModel { (windowSize: WindowSize) ->
         DashboardGalleryViewModel(
             get(),
@@ -166,7 +174,7 @@ val screenModule = module {
 
     factory { DiscoveryRepository(get(), get(), get()) }
     factory { DiscoveryInteractor(get()) }
-    viewModel { NativeDiscoveryViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { NativeDiscoveryViewModel(get(), get(), get(), get(), get(), get()) }
     viewModel { (querySearch: String) ->
         WebViewDiscoveryViewModel(
             querySearch,
@@ -190,7 +198,16 @@ val screenModule = module {
             profileRouter = get(),
         )
     }
-    viewModel { (account: Account) -> EditProfileViewModel(get(), get(), get(), get(), get(), account) }
+    viewModel { (account: Account) ->
+        EditProfileViewModel(
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            account
+        )
+    }
     viewModel { VideoSettingsViewModel(get(), get(), get(), get()) }
     viewModel { (qualityType: String) -> VideoQualityViewModel(qualityType, get(), get(), get()) }
     viewModel { DeleteProfileViewModel(get(), get(), get(), get(), get()) }
@@ -220,6 +237,7 @@ val screenModule = module {
 
     single { CourseRepository(get(), get(), get(), get(), get()) }
     factory { CourseInteractor(get()) }
+    single<org.openedx.core.domain.interactor.CourseInteractor> { get<CourseInteractor>() }
 
     viewModel { (pathId: String, infoType: String) ->
         CourseInfoViewModel(
@@ -267,7 +285,7 @@ val screenModule = module {
         )
     }
     viewModel { (courseId: String, courseTitle: String) ->
-        CourseOutlineViewModel(
+        CourseContentAllViewModel(
             courseId,
             courseTitle,
             get(),
@@ -284,6 +302,34 @@ val screenModule = module {
             get(),
             get(),
             get(),
+        )
+    }
+    viewModel { (courseId: String, courseTitle: String) ->
+        ContentTabViewModel(
+            courseId,
+            courseTitle,
+            get(),
+        )
+    }
+    viewModel { (courseId: String, courseTitle: String) ->
+        CourseHomeViewModel(
+            courseId,
+            courseTitle,
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get(),
+            get()
         )
     }
     viewModel { (courseId: String) ->
@@ -295,10 +341,12 @@ val screenModule = module {
             get(),
         )
     }
-    viewModel { (courseId: String, unitId: String) ->
+    viewModel { (courseId: String, unitId: String, mode: CourseViewMode) ->
         CourseUnitContainerViewModel(
             courseId,
             unitId,
+            mode,
+            get(),
             get(),
             get(),
             get(),
@@ -306,10 +354,9 @@ val screenModule = module {
             get(),
         )
     }
-    viewModel { (courseId: String, courseTitle: String) ->
+    viewModel { (courseId: String) ->
         CourseVideoViewModel(
             courseId,
-            courseTitle,
             get(),
             get(),
             get(),
@@ -329,9 +376,11 @@ val screenModule = module {
     }
     viewModel { (courseId: String) -> BaseVideoViewModel(courseId, get()) }
     viewModel { (courseId: String) -> VideoViewModel(courseId, get(), get(), get(), get()) }
-    viewModel { (courseId: String) ->
+    viewModel { (courseId: String, videoUrl: String, blockId: String) ->
         VideoUnitViewModel(
             courseId,
+            videoUrl,
+            blockId,
             get(),
             get(),
             get(),
@@ -339,9 +388,10 @@ val screenModule = module {
             get()
         )
     }
-    viewModel { (courseId: String, blockId: String) ->
+    viewModel { (courseId: String, videoUrl: String, blockId: String) ->
         EncodedVideoUnitViewModel(
             courseId,
+            videoUrl,
             blockId,
             get(),
             get(),
@@ -480,6 +530,57 @@ val screenModule = module {
             get(),
             get(),
             get(),
+            get()
+        )
+    }
+    viewModel { (courseId: String) ->
+        CourseProgressViewModel(
+            courseId,
+            get(),
+            get()
+        )
+    }
+
+    single {
+        DownloadRepository(
+            api = get(),
+            corePreferences = get(),
+            dao = get(),
+            courseDao = get()
+        )
+    }
+    single {
+        DownloadInteractor(
+            repository = get()
+        )
+    }
+    viewModel {
+        DownloadsViewModel(
+            downloadsRouter = get(),
+            networkConnection = get(),
+            interactor = get(),
+            resourceManager = get(),
+            config = get(),
+            preferencesManager = get(),
+            coreAnalytics = get(),
+            downloadDao = get(),
+            workerController = get(),
+            downloadHelper = get(),
+            downloadDialogManager = get(),
+            fileUtil = get(),
+            analytics = get(),
+            discoveryNotifier = get(),
+            courseNotifier = get(),
+            router = get()
+        )
+    }
+    viewModel { (courseId: String) ->
+        CourseAssignmentViewModel(
+            courseId = courseId,
+            interactor = get(),
+            courseRouter = get(),
+            courseNotifier = get(),
+            analytics = get()
         )
     }
 }

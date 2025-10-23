@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -33,8 +35,7 @@ import androidx.compose.material.Scaffold
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -46,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -62,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.Lifecycle
@@ -89,6 +93,7 @@ import org.openedx.core.ui.HandleUIMessage
 import org.openedx.core.ui.OfflineModeDialog
 import org.openedx.core.ui.OpenEdXButton
 import org.openedx.core.ui.TextIcon
+import org.openedx.core.ui.displayCutoutForLandscape
 import org.openedx.core.ui.theme.OpenEdXTheme
 import org.openedx.core.ui.theme.appColors
 import org.openedx.core.ui.theme.appShapes
@@ -100,6 +105,7 @@ import org.openedx.dashboard.R
 import org.openedx.foundation.extension.toImageLink
 import org.openedx.foundation.presentation.UIMessage
 import org.openedx.foundation.presentation.rememberWindowSize
+import org.openedx.foundation.presentation.windowSizeValue
 import java.util.Date
 import org.openedx.core.R as CoreR
 
@@ -181,6 +187,7 @@ private fun DashboardGalleryView(
     onAction: (DashboardGalleryScreenAction) -> Unit,
     hasInternetConnection: Boolean
 ) {
+    val windowSize = rememberWindowSize()
     val scaffoldState = rememberScaffoldState()
     val pullRefreshState = rememberPullRefreshState(
         refreshing = updating,
@@ -188,6 +195,24 @@ private fun DashboardGalleryView(
     )
     var isInternetConnectionShown by rememberSaveable {
         mutableStateOf(false)
+    }
+
+    val contentWidth by remember(key1 = windowSize) {
+        mutableStateOf(
+            windowSize.windowSizeValue(
+                expanded = Modifier.widthIn(Dp.Unspecified, 560.dp),
+                compact = Modifier.fillMaxWidth(),
+            )
+        )
+    }
+
+    val contentPadding by remember(key1 = windowSize) {
+        mutableStateOf(
+            windowSize.windowSizeValue(
+                expanded = PaddingValues(0.dp),
+                compact = PaddingValues(horizontal = 16.dp)
+            )
+        )
     }
 
     Scaffold(
@@ -201,68 +226,71 @@ private fun DashboardGalleryView(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
+                .displayCutoutForLandscape()
                 .padding(paddingValues),
             color = MaterialTheme.appColors.background
         ) {
             Box(
-                Modifier.fillMaxSize()
+                Modifier
+                    .fillMaxSize()
+                    .pullRefresh(pullRefreshState)
+                    .verticalScroll(rememberScrollState()),
             ) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .pullRefresh(pullRefreshState)
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    when (uiState) {
-                        is DashboardGalleryUIState.Loading -> {
-                            CircularProgressIndicator(
-                                modifier = Modifier.align(Alignment.Center),
-                                color = MaterialTheme.appColors.primary
-                            )
-                        }
-
-                        is DashboardGalleryUIState.Courses -> {
-                            UserCourses(
-                                modifier = Modifier.fillMaxSize(),
-                                userCourses = uiState.userCourses,
-                                useRelativeDates = uiState.useRelativeDates,
-                                apiHostUrl = apiHostUrl,
-                                openCourse = {
-                                    onAction(DashboardGalleryScreenAction.OpenCourse(it))
-                                },
-                                onViewAllClick = {
-                                    onAction(DashboardGalleryScreenAction.ViewAll)
-                                },
-                                navigateToDates = {
-                                    onAction(DashboardGalleryScreenAction.NavigateToDates(it))
-                                },
-                                resumeBlockId = { course, blockId ->
-                                    onAction(DashboardGalleryScreenAction.OpenBlock(course, blockId))
-                                }
-                            )
-                        }
-
-                        is DashboardGalleryUIState.Empty -> {
-                            NoCoursesInfo(
-                                modifier = Modifier
-                                    .align(Alignment.Center)
-                            )
-                            FindACourseButton(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter),
-                                findACourseClick = {
-                                    onAction(DashboardGalleryScreenAction.NavigateToDiscovery)
-                                }
-                            )
-                        }
+                when (uiState) {
+                    is DashboardGalleryUIState.Loading -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center),
+                            color = MaterialTheme.appColors.primary
+                        )
                     }
 
-                    PullRefreshIndicator(
-                        updating,
-                        pullRefreshState,
-                        Modifier.align(Alignment.TopCenter)
-                    )
+                    is DashboardGalleryUIState.Courses -> {
+                        UserCourses(
+                            modifier = contentWidth
+                                .fillMaxHeight()
+                                .padding(vertical = 12.dp)
+                                .displayCutoutForLandscape()
+                                .align(Alignment.TopCenter),
+                            contentPadding = contentPadding,
+                            userCourses = uiState.userCourses,
+                            useRelativeDates = uiState.useRelativeDates,
+                            apiHostUrl = apiHostUrl,
+                            openCourse = {
+                                onAction(DashboardGalleryScreenAction.OpenCourse(it))
+                            },
+                            onViewAllClick = {
+                                onAction(DashboardGalleryScreenAction.ViewAll)
+                            },
+                            navigateToDates = {
+                                onAction(DashboardGalleryScreenAction.NavigateToDates(it))
+                            },
+                            resumeBlockId = { course, blockId ->
+                                onAction(DashboardGalleryScreenAction.OpenBlock(course, blockId))
+                            }
+                        )
+                    }
+
+                    is DashboardGalleryUIState.Empty -> {
+                        NoCoursesInfo(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                        )
+                        FindACourseButton(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter),
+                            findACourseClick = {
+                                onAction(DashboardGalleryScreenAction.NavigateToDiscovery)
+                            }
+                        )
+                    }
                 }
+
+                PullRefreshIndicator(
+                    updating,
+                    pullRefreshState,
+                    Modifier.align(Alignment.TopCenter)
+                )
+
                 if (!isInternetConnectionShown && !hasInternetConnection) {
                     OfflineModeDialog(
                         Modifier
@@ -286,6 +314,7 @@ private fun DashboardGalleryView(
 private fun UserCourses(
     modifier: Modifier = Modifier,
     userCourses: CourseEnrollments,
+    contentPadding: PaddingValues,
     apiHostUrl: String,
     useRelativeDates: Boolean,
     openCourse: (EnrolledCourse) -> Unit,
@@ -295,11 +324,11 @@ private fun UserCourses(
 ) {
     Column(
         modifier = modifier
-            .padding(vertical = 12.dp)
     ) {
         val primaryCourse = userCourses.primary
         if (primaryCourse != null) {
             PrimaryCourseCard(
+                modifier = Modifier.padding(contentPadding),
                 primaryCourse = primaryCourse,
                 apiHostUrl = apiHostUrl,
                 navigateToDates = navigateToDates,
@@ -313,6 +342,7 @@ private fun UserCourses(
                 courses = userCourses.enrollments.courses,
                 hasNextPage = userCourses.enrollments.pagination.next.isNotEmpty(),
                 apiHostUrl = apiHostUrl,
+                contentPadding = contentPadding,
                 onCourseClick = openCourse,
                 onViewAllClick = onViewAllClick
             )
@@ -325,6 +355,7 @@ private fun SecondaryCourses(
     courses: List<EnrolledCourse>,
     hasNextPage: Boolean,
     apiHostUrl: String,
+    contentPadding: PaddingValues,
     onCourseClick: (EnrolledCourse) -> Unit,
     onViewAllClick: () -> Unit
 ) {
@@ -344,10 +375,10 @@ private fun SecondaryCourses(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         TextIcon(
-            modifier = Modifier.padding(horizontal = 18.dp),
+            modifier = Modifier.padding(contentPadding),
             text = stringResource(R.string.dashboard_view_all_with_count, courses.size + 1),
             textStyle = MaterialTheme.appTypography.titleSmall,
-            icon = Icons.Default.ChevronRight,
+            icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             color = MaterialTheme.appColors.textDark,
             iconModifier = Modifier.size(22.dp),
             onClick = onViewAllClick
@@ -357,7 +388,7 @@ private fun SecondaryCourses(
                 .fillMaxSize()
                 .height(height),
             rows = GridCells.Fixed(rows),
-            contentPadding = PaddingValues(horizontal = 18.dp),
+            contentPadding = contentPadding,
             content = {
                 items(items) {
                     CourseListItem(
@@ -512,8 +543,8 @@ private fun AssignmentItem(
             }
         }
         Icon(
-            modifier = Modifier.size(16.dp),
-            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+            modifier = Modifier.size(22.dp),
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             tint = MaterialTheme.appColors.textDark,
             contentDescription = null
         )
@@ -522,6 +553,7 @@ private fun AssignmentItem(
 
 @Composable
 private fun PrimaryCourseCard(
+    modifier: Modifier = Modifier,
     primaryCourse: EnrolledCourse,
     apiHostUrl: String,
     useRelativeDates: Boolean,
@@ -529,113 +561,187 @@ private fun PrimaryCourseCard(
     resumeBlockId: (enrolledCourse: EnrolledCourse, blockId: String) -> Unit,
     openCourse: (EnrolledCourse) -> Unit,
 ) {
-    val context = LocalContext.current
+    val orientation = LocalConfiguration.current.orientation
     Card(
-        modifier = Modifier
-            .padding(horizontal = 16.dp)
+        modifier = modifier
             .fillMaxWidth()
             .padding(2.dp),
         backgroundColor = MaterialTheme.appColors.background,
         shape = MaterialTheme.appShapes.courseImageShape,
         elevation = 4.dp
     ) {
-        Column(
-            modifier = Modifier
-                .clickable {
-                    openCourse(primaryCourse)
+        when (orientation) {
+            Configuration.ORIENTATION_LANDSCAPE -> {
+                Row(
+                    modifier = Modifier
+                        .clickable {
+                            openCourse(primaryCourse)
+                        }
+                        .height(IntrinsicSize.Min)
+                ) {
+                    PrimaryCourseCaption(
+                        modifier = Modifier.weight(1f),
+                        primaryCourse = primaryCourse,
+                        apiHostUrl = apiHostUrl,
+                        imageHeight = null,
+                    )
+                    PrimaryCourseButtons(
+                        modifier = Modifier.weight(1f),
+                        primaryCourse = primaryCourse,
+                        navigateToDates = navigateToDates,
+                        resumeBlockId = resumeBlockId,
+                        openCourse = openCourse,
+                        adjustHeight = true,
+                        useRelativeDates = useRelativeDates,
+                    )
                 }
-        ) {
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(primaryCourse.course.courseImage.toImageLink(apiHostUrl))
-                    .error(CoreR.drawable.core_no_image_course)
-                    .placeholder(CoreR.drawable.core_no_image_course)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(140.dp)
-            )
-            val progress: Float = try {
-                primaryCourse.progress.assignmentsCompleted.toFloat() /
-                        primaryCourse.progress.totalAssignmentsCount.toFloat()
-            } catch (_: ArithmeticException) {
-                0f
             }
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp),
-                progress = progress,
-                color = MaterialTheme.appColors.primary,
-                backgroundColor = MaterialTheme.appColors.divider
-            )
-            PrimaryCourseTitle(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .padding(top = 8.dp, bottom = 16.dp),
-                primaryCourse = primaryCourse
-            )
-            val pastAssignments = primaryCourse.courseAssignments?.pastAssignments
-            if (!pastAssignments.isNullOrEmpty()) {
-                val nearestAssignment = pastAssignments.maxBy { it.date }
-                val title = if (pastAssignments.size == 1) nearestAssignment.title else null
-                Divider()
-                AssignmentItem(
+
+            else -> {
+                Column(
                     modifier = Modifier.clickable {
-                        if (pastAssignments.size == 1) {
-                            resumeBlockId(primaryCourse, nearestAssignment.blockId)
-                        } else {
-                            navigateToDates(primaryCourse)
-                        }
-                    },
-                    painter = rememberVectorPainter(Icons.Default.Warning),
-                    title = title,
-                    info = pluralStringResource(
-                        R.plurals.dashboard_past_due_assignment,
-                        pastAssignments.size,
-                        pastAssignments.size
-                    )
-                )
-            }
-            val futureAssignments = primaryCourse.courseAssignments?.futureAssignments
-            if (!futureAssignments.isNullOrEmpty()) {
-                val nearestAssignment = futureAssignments.minBy { it.date }
-                val title = if (futureAssignments.size == 1) nearestAssignment.title else null
-                Divider()
-                AssignmentItem(
-                    modifier = Modifier.clickable {
-                        if (futureAssignments.size == 1) {
-                            resumeBlockId(primaryCourse, nearestAssignment.blockId)
-                        } else {
-                            navigateToDates(primaryCourse)
-                        }
-                    },
-                    painter = painterResource(id = CoreR.drawable.ic_core_chapter_icon),
-                    title = title,
-                    info = stringResource(
-                        R.string.dashboard_assignment_due,
-                        nearestAssignment.assignmentType ?: "",
-                        stringResource(
-                            id = CoreR.string.core_date_format_assignment_due,
-                            TimeUtils.formatToString(context, nearestAssignment.date, useRelativeDates)
-                        )
-                    )
-                )
-            }
-            ResumeButton(
-                primaryCourse = primaryCourse,
-                onClick = {
-                    if (primaryCourse.courseStatus == null) {
                         openCourse(primaryCourse)
-                    } else {
-                        resumeBlockId(primaryCourse, primaryCourse.courseStatus?.lastVisitedBlockId ?: "")
                     }
+                ) {
+                    PrimaryCourseCaption(
+                        primaryCourse = primaryCourse,
+                        apiHostUrl = apiHostUrl,
+                    )
+                    PrimaryCourseButtons(
+                        primaryCourse = primaryCourse,
+                        navigateToDates = navigateToDates,
+                        resumeBlockId = resumeBlockId,
+                        openCourse = openCourse,
+                        useRelativeDates = useRelativeDates,
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrimaryCourseButtons(
+    modifier: Modifier = Modifier,
+    primaryCourse: EnrolledCourse,
+    useRelativeDates: Boolean,
+    adjustHeight: Boolean = false,
+    navigateToDates: (EnrolledCourse) -> Unit,
+    resumeBlockId: (enrolledCourse: EnrolledCourse, blockId: String) -> Unit,
+    openCourse: (EnrolledCourse) -> Unit,
+) {
+    val context = LocalContext.current
+    val pastAssignments = primaryCourse.courseAssignments?.pastAssignments
+    Column(modifier = modifier) {
+        var titleModifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .padding(top = 8.dp, bottom = 16.dp)
+        if (adjustHeight) {
+            titleModifier = titleModifier.weight(1f)
+        }
+        PrimaryCourseTitle(
+            modifier = titleModifier,
+            primaryCourse = primaryCourse,
+        )
+        Divider()
+        if (!pastAssignments.isNullOrEmpty()) {
+            val nearestAssignment = pastAssignments.maxBy { it.date }
+            val title = if (pastAssignments.size == 1) nearestAssignment.title else null
+            AssignmentItem(
+                modifier = Modifier.clickable {
+                    if (pastAssignments.size == 1) {
+                        resumeBlockId(primaryCourse, nearestAssignment.blockId)
+                    } else {
+                        navigateToDates(primaryCourse)
+                    }
+                },
+                painter = rememberVectorPainter(Icons.Default.Warning),
+                title = title,
+                info = pluralStringResource(
+                    R.plurals.dashboard_past_due_assignment,
+                    pastAssignments.size,
+                    pastAssignments.size
+                )
             )
         }
+        val futureAssignments = primaryCourse.courseAssignments?.futureAssignments
+        if (!futureAssignments.isNullOrEmpty()) {
+            val nearestAssignment = futureAssignments.minBy { it.date }
+            val title = if (futureAssignments.size == 1) nearestAssignment.title else null
+            Divider()
+            AssignmentItem(
+                modifier = Modifier.clickable {
+                    if (futureAssignments.size == 1) {
+                        resumeBlockId(primaryCourse, nearestAssignment.blockId)
+                    } else {
+                        navigateToDates(primaryCourse)
+                    }
+                },
+                painter = painterResource(id = CoreR.drawable.core_ic_chapter_icon),
+                title = title,
+                info = stringResource(
+                    R.string.dashboard_assignment_due,
+                    nearestAssignment.assignmentType ?: "",
+                    stringResource(
+                        id = CoreR.string.core_date_format_assignment_due,
+                        TimeUtils.formatToString(context, nearestAssignment.date, useRelativeDates),
+                    )
+                )
+            )
+        }
+        ResumeButton(
+            primaryCourse = primaryCourse,
+            onClick = {
+                if (primaryCourse.courseStatus == null) {
+                    openCourse(primaryCourse)
+                } else {
+                    resumeBlockId(
+                        primaryCourse,
+                        primaryCourse.courseStatus?.lastVisitedBlockId ?: ""
+                    )
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun PrimaryCourseCaption(
+    modifier: Modifier = Modifier,
+    primaryCourse: EnrolledCourse,
+    imageHeight: Dp? = 140.dp,
+    apiHostUrl: String,
+) {
+    val context = LocalContext.current
+    Column(modifier = modifier) {
+        val imageModifier = imageHeight?.let {
+            Modifier
+                .height(it)
+                .fillMaxWidth()
+        } ?: Modifier
+            .height(IntrinsicSize.Max)
+            .fillMaxWidth()
+            .weight(1f)
+
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(primaryCourse.course.courseImage.toImageLink(apiHostUrl))
+                .error(CoreR.drawable.core_no_image_course)
+                .placeholder(CoreR.drawable.core_no_image_course)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = imageModifier,
+        )
+        LinearProgressIndicator(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp),
+            progress = primaryCourse.progress.value,
+            color = MaterialTheme.appColors.primary,
+            backgroundColor = MaterialTheme.appColors.divider
+        )
     }
 }
 
@@ -690,8 +796,8 @@ private fun ResumeButton(
             }
         }
         Icon(
-            modifier = Modifier.size(16.dp),
-            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+            modifier = Modifier.size(22.dp),
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             tint = MaterialTheme.appColors.primaryButtonText,
             contentDescription = null
         )
@@ -705,7 +811,7 @@ private fun PrimaryCourseTitle(
 ) {
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.Center
     ) {
         Text(
             modifier = Modifier.fillMaxWidth(),
@@ -714,7 +820,9 @@ private fun PrimaryCourseTitle(
             color = MaterialTheme.appColors.textFieldHint
         )
         Text(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
             text = primaryCourse.course.name,
             style = MaterialTheme.appTypography.titleLarge,
             color = MaterialTheme.appColors.textDark,
@@ -722,7 +830,9 @@ private fun PrimaryCourseTitle(
             maxLines = 3
         )
         Text(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
             style = MaterialTheme.appTypography.labelMedium,
             color = MaterialTheme.appColors.textFieldHint,
             text = TimeUtils.getCourseFormattedDate(

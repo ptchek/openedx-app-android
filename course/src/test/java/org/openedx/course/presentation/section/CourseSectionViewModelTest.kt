@@ -38,11 +38,11 @@ import org.openedx.core.module.db.DownloadModelEntity
 import org.openedx.core.module.db.DownloadedState
 import org.openedx.core.module.db.FileType
 import org.openedx.core.presentation.CoreAnalytics
-import org.openedx.core.presentation.course.CourseViewMode
 import org.openedx.core.system.connection.NetworkConnection
 import org.openedx.core.system.notifier.CourseNotifier
 import org.openedx.course.domain.interactor.CourseInteractor
 import org.openedx.course.presentation.CourseAnalytics
+import org.openedx.course.presentation.unit.container.CourseViewMode
 import org.openedx.foundation.presentation.UIMessage
 import org.openedx.foundation.system.ResourceManager
 import java.net.UnknownHostException
@@ -73,7 +73,8 @@ class CourseSectionViewModelTest {
     private val assignmentProgress = AssignmentProgress(
         assignmentType = "Homework",
         numPointsEarned = 1f,
-        numPointsPossible = 3f
+        numPointsPossible = 3f,
+        shortLabel = "HW1",
     )
 
     private val blocks = listOf(

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
@@ -27,11 +28,11 @@ import org.openedx.auth.presentation.logistration.LogistrationFragment
 import org.openedx.auth.presentation.signin.SignInFragment
 import org.openedx.core.ApiConstants
 import org.openedx.core.data.storage.CorePreferences
+import org.openedx.core.presentation.dialog.downloaddialog.DownloadDialogManager
 import org.openedx.core.presentation.global.InsetHolder
 import org.openedx.core.presentation.global.WindowSizeHolder
 import org.openedx.core.utils.Logger
 import org.openedx.core.worker.CalendarSyncScheduler
-import org.openedx.course.presentation.download.DownloadDialogManager
 import org.openedx.foundation.extension.requestApplyInsetsWhenAttached
 import org.openedx.foundation.presentation.WindowSize
 import org.openedx.foundation.presentation.WindowType
@@ -157,10 +158,14 @@ class AppActivity : AppCompatActivity(), InsetHolder, WindowSizeHolder {
         window.apply {
             addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
             WindowCompat.setDecorFitsSystemWindows(this, false)
-
             val insetsController = WindowInsetsControllerCompat(this, binding.root)
             insetsController.isAppearanceLightStatusBars = !isUsingNightModeResources()
-            statusBarColor = Color.TRANSPARENT
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                insetsController.systemBarsBehavior =
+                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                window.statusBarColor = Color.TRANSPARENT
+            }
         }
     }
 
@@ -214,7 +219,7 @@ class AppActivity : AppCompatActivity(), InsetHolder, WindowSizeHolder {
         }
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         this.intent = intent
 
@@ -222,13 +227,13 @@ class AppActivity : AppCompatActivity(), InsetHolder, WindowSizeHolder {
             addFragment(SignInFragment.newInstance(null, null, authCode = authCode))
         }
 
-        val extras = intent?.extras
+        val extras = intent.extras
         if (extras?.containsKey(DeepLink.Keys.NOTIFICATION_TYPE.value) == true) {
             handlePushNotification(extras)
         }
 
         if (viewModel.isBranchEnabled) {
-            if (intent?.getBooleanExtra(BRANCH_FORCE_NEW_SESSION, false) == true) {
+            if (intent.getBooleanExtra(BRANCH_FORCE_NEW_SESSION, false)) {
                 Branch.sessionBuilder(this)
                     .withCallback(branchCallback)
                     .reInit()

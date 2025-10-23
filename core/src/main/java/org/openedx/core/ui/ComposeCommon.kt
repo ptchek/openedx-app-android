@@ -1,7 +1,5 @@
 package org.openedx.core.ui
 
-import android.os.Build
-import android.os.Build.VERSION.SDK_INT
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -19,9 +17,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -52,6 +50,7 @@ import androidx.compose.material.ScaffoldState
 import androidx.compose.material.Text
 import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
@@ -80,7 +79,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -105,15 +103,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import coil.ImageLoader
-import coil.compose.AsyncImage
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
 import kotlinx.coroutines.launch
 import org.openedx.core.NoContentScreenType
 import org.openedx.core.R
 import org.openedx.core.domain.model.RegistrationField
-import org.openedx.core.extension.LinkedImageText
 import org.openedx.core.presentation.global.ErrorType
 import org.openedx.core.ui.theme.OpenEdXTheme
 import org.openedx.core.ui.theme.appColors
@@ -217,6 +210,40 @@ fun Toolbar(
                     contentDescription = stringResource(id = R.string.core_accessibility_settings)
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun MainToolbar(
+    modifier: Modifier = Modifier,
+    label: String,
+    onSettingsClick: () -> Unit,
+) {
+    Box(
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Text(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 16.dp),
+            text = label,
+            color = MaterialTheme.appColors.textDark,
+            style = MaterialTheme.appTypography.headlineBold
+        )
+        IconButton(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 12.dp),
+            onClick = {
+                onSettingsClick()
+            }
+        ) {
+            Icon(
+                imageVector = Icons.Default.ManageAccounts,
+                tint = MaterialTheme.appColors.textAccent,
+                contentDescription = stringResource(id = R.string.core_accessibility_settings)
+            )
         }
     }
 }
@@ -505,131 +532,6 @@ fun HyperlinkText(
         },
         style = textStyle
     )
-}
-
-@Composable
-fun HyperlinkImageText(
-    modifier: Modifier = Modifier,
-    title: String = "",
-    imageText: LinkedImageText,
-    textStyle: TextStyle = TextStyle.Default,
-    linkTextColor: Color = MaterialTheme.appColors.primary,
-    linkTextFontWeight: FontWeight = FontWeight.Normal,
-    linkTextDecoration: TextDecoration = TextDecoration.None,
-    fontSize: TextUnit = TextUnit.Unspecified,
-) {
-    val fullText = imageText.text
-    val hyperLinks = imageText.links
-    val annotatedString = buildAnnotatedString {
-        if (title.isNotEmpty()) {
-            append(title)
-            append("\n\n")
-        }
-        append(fullText)
-        addStyle(
-            style = SpanStyle(
-                color = MaterialTheme.appColors.textPrimary,
-                fontSize = fontSize
-            ),
-            start = 0,
-            end = this.length
-        )
-
-        for ((key, value) in hyperLinks) {
-            val startIndex = this.toString().indexOf(key)
-            if (startIndex == -1) continue
-            val endIndex = startIndex + key.length
-            addStyle(
-                style = SpanStyle(
-                    color = linkTextColor,
-                    fontSize = fontSize,
-                    fontWeight = linkTextFontWeight,
-                    textDecoration = linkTextDecoration
-                ),
-                start = startIndex,
-                end = endIndex
-            )
-            addStringAnnotation(
-                tag = "URL",
-                annotation = value,
-                start = startIndex,
-                end = endIndex
-            )
-        }
-        if (title.isNotEmpty()) {
-            addStyle(
-                style = SpanStyle(
-                    color = MaterialTheme.appColors.textPrimary,
-                    fontSize = MaterialTheme.appTypography.titleLarge.fontSize,
-                    fontWeight = MaterialTheme.appTypography.titleLarge.fontWeight
-                ),
-                start = 0,
-                end = title.length
-            )
-        }
-        for (item in imageText.headers) {
-            val startIndex = this.toString().indexOf(item)
-            if (startIndex == -1) continue
-            val endIndex = startIndex + item.length
-            addStyle(
-                style = SpanStyle(
-                    color = MaterialTheme.appColors.textPrimary,
-                    fontSize = MaterialTheme.appTypography.titleLarge.fontSize,
-                    fontWeight = MaterialTheme.appTypography.titleLarge.fontWeight
-                ),
-                start = startIndex,
-                end = endIndex
-            )
-        }
-        addStyle(
-            style = SpanStyle(
-                fontSize = fontSize
-            ),
-            start = 0,
-            end = this.length
-        )
-    }
-
-    val uriHandler = LocalUriHandler.current
-    val context = LocalContext.current
-    val imageLoader = ImageLoader.Builder(context)
-        .components {
-            if (SDK_INT >= Build.VERSION_CODES.P) {
-                add(ImageDecoderDecoder.Factory())
-            } else {
-                add(GifDecoder.Factory())
-            }
-        }
-        .build()
-
-    Column(Modifier.fillMaxWidth()) {
-        BasicText(
-            text = annotatedString,
-            modifier = modifier.pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    val position = offset.x.toInt()
-                    annotatedString.getStringAnnotations("URL", position, position)
-                        .firstOrNull()?.let { stringAnnotation ->
-                            uriHandler.openUri(stringAnnotation.item)
-                        }
-                }
-            },
-            style = textStyle
-        )
-        imageText.imageLinks.values.forEach {
-            Spacer(Modifier.height(8.dp))
-            AsyncImage(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(0.dp, 360.dp),
-                contentScale = ContentScale.Fit,
-                model = it,
-                contentDescription = null,
-                imageLoader = imageLoader
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-    }
 }
 
 @Composable
@@ -1082,7 +984,9 @@ fun OfflineModeDialog(
 
 @Composable
 fun OpenEdXButton(
-    modifier: Modifier = Modifier.fillMaxWidth(),
+    modifier: Modifier = Modifier
+        .fillMaxWidth()
+        .height(42.dp),
     text: String = "",
     onClick: () -> Unit,
     enabled: Boolean = true,
@@ -1093,8 +997,7 @@ fun OpenEdXButton(
     Button(
         modifier = Modifier
             .testTag("btn_${text.tagId()}")
-            .then(modifier)
-            .height(42.dp),
+            .then(modifier),
         shape = MaterialTheme.appShapes.buttonShape,
         colors = ButtonDefaults.buttonColors(
             backgroundColor = backgroundColor
@@ -1163,7 +1066,7 @@ fun BackBtn(
         }
     ) {
         Icon(
-            painter = painterResource(id = R.drawable.core_ic_back),
+            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = stringResource(id = R.string.core_accessibility_btn_back),
             tint = tint
         )
@@ -1240,7 +1143,11 @@ fun NoContentScreen(message: String, icon: Painter) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
-            modifier = Modifier.size(80.dp),
+            modifier = Modifier
+                .sizeIn(
+                    maxWidth = 80.dp,
+                    maxHeight = 80.dp
+                ),
             painter = icon,
             contentDescription = null,
             tint = MaterialTheme.appColors.progressBarBackgroundColor,
@@ -1264,6 +1171,24 @@ fun AuthButtonsPanel(
     showRegisterButton: Boolean,
 ) {
     Row {
+        OpenEdXOutlinedButton(
+            modifier = Modifier
+                .testTag("btn_sign_in")
+                .then(
+                    if (showRegisterButton) {
+                        Modifier
+                            .width(100.dp)
+                            .padding(end = 16.dp)
+                    } else {
+                        Modifier.weight(1f)
+                    }
+                ),
+            text = stringResource(id = R.string.core_sign_in),
+            onClick = { onSignInClick() },
+            textColor = MaterialTheme.appColors.secondaryButtonBorderedText,
+            backgroundColor = MaterialTheme.appColors.secondaryButtonBorderedBackground,
+            borderColor = MaterialTheme.appColors.secondaryButtonBorder,
+        )
         if (showRegisterButton) {
             OpenEdXButton(
                 modifier = Modifier
@@ -1276,25 +1201,6 @@ fun AuthButtonsPanel(
                 onClick = { onRegisterClick() }
             )
         }
-
-        OpenEdXOutlinedButton(
-            modifier = Modifier
-                .testTag("btn_sign_in")
-                .then(
-                    if (showRegisterButton) {
-                        Modifier
-                            .width(100.dp)
-                            .padding(start = 16.dp)
-                    } else {
-                        Modifier.weight(1f)
-                    }
-                ),
-            text = stringResource(id = R.string.core_sign_in),
-            onClick = { onSignInClick() },
-            textColor = MaterialTheme.appColors.secondaryButtonBorderedText,
-            backgroundColor = MaterialTheme.appColors.secondaryButtonBorderedBackground,
-            borderColor = MaterialTheme.appColors.secondaryButtonBorder,
-        )
     }
 }
 
@@ -1402,6 +1308,23 @@ private fun RoundTab(
             color = contentColor
         )
     }
+}
+
+@Composable
+fun OpenEdXDropdownMenuItem(
+    modifier: Modifier = Modifier,
+    text: String,
+    onClick: () -> Unit
+) {
+    Text(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(16.dp),
+        text = text,
+        style = MaterialTheme.appTypography.labelLarge,
+        color = MaterialTheme.appColors.textDark,
+    )
 }
 
 @Preview
