@@ -51,6 +51,7 @@ import androidx.compose.material.Snackbar
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
@@ -338,6 +339,7 @@ fun NavigationUnitsButtons(
     nextButtonText: String,
     hasPrevBlock: Boolean,
     hasNextBlock: Boolean,
+    showFinishButton: Boolean = true,
     isVerticalNavigation: Boolean,
     onPrevClick: () -> Unit,
     onNextClick: () -> Unit,
@@ -375,7 +377,7 @@ fun NavigationUnitsButtons(
                 colors = ButtonDefaults.outlinedButtonColors(
                     backgroundColor = MaterialTheme.appColors.background
                 ),
-                border = BorderStroke(1.dp, MaterialTheme.appColors.primaryButtonBorder),
+                border = BorderStroke(1.dp, MaterialTheme.appColors.textAccent),
                 elevation = null,
                 shape = MaterialTheme.appShapes.navigationButtonShape,
                 onClick = onPrevClick,
@@ -384,48 +386,66 @@ fun NavigationUnitsButtons(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
+                    if (!isVerticalNavigation) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = MaterialTheme.appColors.textAccent
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
                     Text(
                         text = stringResource(R.string.course_navigation_prev),
-                        color = MaterialTheme.appColors.primary,
+                        color = MaterialTheme.appColors.textAccent,
                         style = MaterialTheme.appTypography.labelLarge
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Icon(
-                        modifier = Modifier.rotate(if (isVerticalNavigation) 0f else -90f),
-                        painter = painterResource(id = coreR.drawable.core_ic_up),
-                        contentDescription = null,
-                        tint = MaterialTheme.appColors.primary
-                    )
+                    if (isVerticalNavigation) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            painter = painterResource(id = coreR.drawable.core_ic_up),
+                            contentDescription = null,
+                            tint = MaterialTheme.appColors.textAccent
+                        )
+                    }
                 }
             }
             Spacer(Modifier.width(16.dp))
         }
-        Button(
-            modifier = Modifier
-                .height(42.dp),
-            colors = ButtonDefaults.buttonColors(
-                backgroundColor = MaterialTheme.appColors.primaryButtonBackground
-            ),
-            elevation = null,
-            shape = MaterialTheme.appShapes.navigationButtonShape,
-            onClick = onNextClick
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+        if (hasNextBlock || showFinishButton) {
+            Button(
+                modifier = Modifier
+                    .height(42.dp),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = MaterialTheme.appColors.primaryButtonBackground
+                ),
+                elevation = null,
+                shape = MaterialTheme.appShapes.navigationButtonShape,
+                onClick = onNextClick
             ) {
-                Text(
-                    text = nextButtonText,
-                    color = MaterialTheme.appColors.primaryButtonText,
-                    style = MaterialTheme.appTypography.labelLarge
-                )
-                Spacer(Modifier.width(8.dp))
-                Icon(
-                    modifier = Modifier.rotate(if (isVerticalNavigation || !hasNextBlock) 0f else -90f),
-                    painter = nextButtonIcon,
-                    contentDescription = null,
-                    tint = MaterialTheme.appColors.primaryButtonText
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = nextButtonText,
+                        color = MaterialTheme.appColors.primaryButtonText,
+                        style = MaterialTheme.appTypography.labelLarge
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    if (isVerticalNavigation || !hasNextBlock) {
+                        Icon(
+                            painter = nextButtonIcon,
+                            contentDescription = null,
+                            tint = MaterialTheme.appColors.primaryButtonText
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.appColors.primaryButtonText
+                        )
+                    }
+                }
             }
         }
     }
@@ -700,20 +720,23 @@ fun CourseVideoItem(
     titleStyle: TextStyle = MaterialTheme.appTypography.bodySmall,
     contentModifier: Modifier = Modifier.padding(8.dp),
     progressModifier: Modifier = Modifier.height(4.dp),
+    playButtonSize: Dp = 32.dp,
+    borderColor: Color? = null,
+    borderWidth: Dp = 3.dp,
 ) {
+    val borderColor = borderColor ?: if (videoBlock.isCompleted()) {
+        MaterialTheme.appColors.successGreen
+    } else {
+        Color.Transparent
+    }
     Box(
         modifier = modifier
-            .let {
-                if (videoBlock.isCompleted()) {
-                    it.border(
-                        width = 3.dp,
-                        color = MaterialTheme.appColors.successGreen,
-                        shape = MaterialTheme.appShapes.videoPreviewShape
-                    )
-                } else {
-                    it
-                }
-            }
+            .clip(MaterialTheme.appShapes.videoPreviewShape)
+            .border(
+                width = borderWidth,
+                color = borderColor,
+                shape = MaterialTheme.appShapes.videoPreviewShape
+            )
             .clickable { onClick() }
     ) {
         AsyncImage(
@@ -748,7 +771,7 @@ fun CourseVideoItem(
         ) {
             Image(
                 modifier = Modifier
-                    .size(32.dp)
+                    .size(playButtonSize)
                     .align(Alignment.Center),
                 painter = painterResource(id = R.drawable.course_video_play_button),
                 contentDescription = null,
@@ -761,7 +784,7 @@ fun CourseVideoItem(
                 style = titleStyle,
                 modifier = Modifier
                     .align(Alignment.TopStart),
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
 

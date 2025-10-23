@@ -29,6 +29,7 @@ import org.openedx.course.presentation.outline.CourseContentAllViewModel
 import org.openedx.course.presentation.progress.CourseProgressViewModel
 import org.openedx.course.presentation.section.CourseSectionViewModel
 import org.openedx.course.presentation.unit.container.CourseUnitContainerViewModel
+import org.openedx.course.presentation.unit.container.CourseViewMode
 import org.openedx.course.presentation.unit.html.HtmlUnitViewModel
 import org.openedx.course.presentation.unit.video.BaseVideoViewModel
 import org.openedx.course.presentation.unit.video.EncodedVideoUnitViewModel
@@ -340,10 +341,12 @@ val screenModule = module {
             get(),
         )
     }
-    viewModel { (courseId: String, unitId: String) ->
+    viewModel { (courseId: String, unitId: String, mode: CourseViewMode) ->
         CourseUnitContainerViewModel(
             courseId,
             unitId,
+            mode,
+            get(),
             get(),
             get(),
             get(),

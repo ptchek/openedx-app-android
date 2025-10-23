@@ -20,6 +20,7 @@ import org.junit.Test
 import org.junit.rules.TestRule
 import org.openedx.core.BlockType
 import org.openedx.core.config.Config
+import org.openedx.core.domain.helper.VideoPreviewHelper
 import org.openedx.core.domain.model.AssignmentProgress
 import org.openedx.core.domain.model.Block
 import org.openedx.core.domain.model.BlockCounts
@@ -45,6 +46,7 @@ class CourseUnitContainerViewModelTest {
     private val notifier = mockk<CourseNotifier>()
     private val analytics = mockk<CourseAnalytics>()
     private val networkConnection = mockk<NetworkConnection>()
+    private val videoPreviewHelper = mockk<VideoPreviewHelper>()
 
     private val assignmentProgress = AssignmentProgress(
         assignmentType = "Homework",
@@ -161,6 +163,7 @@ class CourseUnitContainerViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        every { videoPreviewHelper.getVideoPreviews(any(), any()) } returns emptyMap()
     }
 
     @After
@@ -171,13 +174,22 @@ class CourseUnitContainerViewModelTest {
     @Test
     fun `getBlocks no internet connection exception`() = runTest {
         every { notifier.notifier } returns MutableSharedFlow()
-        val viewModel =
-            CourseUnitContainerViewModel("", "", config, interactor, notifier, analytics, networkConnection)
+        val viewModel = CourseUnitContainerViewModel(
+            "",
+            "",
+            CourseViewMode.FULL,
+            config,
+            interactor,
+            notifier,
+            analytics,
+            networkConnection,
+            videoPreviewHelper
+        )
 
         coEvery { interactor.getCourseStructure(any()) } throws UnknownHostException()
         coEvery { interactor.getCourseStructureForVideos(any()) } throws UnknownHostException()
 
-        viewModel.loadBlocks(CourseViewMode.FULL)
+        viewModel.loadBlocks()
         advanceUntilIdle()
 
         coVerify(exactly = 1) { interactor.getCourseStructure(any()) }
@@ -186,13 +198,22 @@ class CourseUnitContainerViewModelTest {
     @Test
     fun `getBlocks unknown exception`() = runTest {
         every { notifier.notifier } returns MutableSharedFlow()
-        val viewModel =
-            CourseUnitContainerViewModel("", "", config, interactor, notifier, analytics, networkConnection)
+        val viewModel = CourseUnitContainerViewModel(
+            "",
+            "",
+            CourseViewMode.FULL,
+            config,
+            interactor,
+            notifier,
+            analytics,
+            networkConnection,
+            videoPreviewHelper
+        )
 
         coEvery { interactor.getCourseStructure(any()) } throws UnknownHostException()
         coEvery { interactor.getCourseStructureForVideos(any()) } throws UnknownHostException()
 
-        viewModel.loadBlocks(CourseViewMode.FULL)
+        viewModel.loadBlocks()
         advanceUntilIdle()
 
         coVerify(exactly = 1) { interactor.getCourseStructure(any()) }
@@ -201,13 +222,22 @@ class CourseUnitContainerViewModelTest {
     @Test
     fun `getBlocks unknown success`() = runTest {
         every { notifier.notifier } returns MutableSharedFlow()
-        val viewModel =
-            CourseUnitContainerViewModel("", "", config, interactor, notifier, analytics, networkConnection)
+        val viewModel = CourseUnitContainerViewModel(
+            "",
+            "",
+            CourseViewMode.VIDEOS,
+            config,
+            interactor,
+            notifier,
+            analytics,
+            networkConnection,
+            videoPreviewHelper
+        )
 
         coEvery { interactor.getCourseStructure(any()) } returns courseStructure
         coEvery { interactor.getCourseStructureForVideos(any()) } returns courseStructure
 
-        viewModel.loadBlocks(CourseViewMode.VIDEOS)
+        viewModel.loadBlocks()
 
         advanceUntilIdle()
 
@@ -218,12 +248,21 @@ class CourseUnitContainerViewModelTest {
     @Test
     fun setupCurrentIndex() = runTest {
         every { notifier.notifier } returns MutableSharedFlow()
-        val viewModel =
-            CourseUnitContainerViewModel("", "", config, interactor, notifier, analytics, networkConnection)
+        val viewModel = CourseUnitContainerViewModel(
+            "",
+            "",
+            CourseViewMode.VIDEOS,
+            config,
+            interactor,
+            notifier,
+            analytics,
+            networkConnection,
+            videoPreviewHelper
+        )
         coEvery { interactor.getCourseStructure(any()) } returns courseStructure
         coEvery { interactor.getCourseStructureForVideos(any()) } returns courseStructure
 
-        viewModel.loadBlocks(CourseViewMode.VIDEOS, "id")
+        viewModel.loadBlocks("id")
         advanceUntilIdle()
 
         coVerify(exactly = 0) { interactor.getCourseStructure(any()) }
@@ -233,12 +272,21 @@ class CourseUnitContainerViewModelTest {
     @Test
     fun `getCurrentBlock test`() = runTest {
         every { notifier.notifier } returns MutableSharedFlow()
-        val viewModel =
-            CourseUnitContainerViewModel("", "", config, interactor, notifier, analytics, networkConnection)
+        val viewModel = CourseUnitContainerViewModel(
+            "",
+            "",
+            CourseViewMode.VIDEOS,
+            config,
+            interactor,
+            notifier,
+            analytics,
+            networkConnection,
+            videoPreviewHelper
+        )
         coEvery { interactor.getCourseStructure(any()) } returns courseStructure
         coEvery { interactor.getCourseStructureForVideos(any()) } returns courseStructure
 
-        viewModel.loadBlocks(CourseViewMode.VIDEOS, "id")
+        viewModel.loadBlocks("id")
 
         advanceUntilIdle()
 
@@ -250,12 +298,21 @@ class CourseUnitContainerViewModelTest {
     @Test
     fun `moveToPrevBlock null`() = runTest {
         every { notifier.notifier } returns MutableSharedFlow()
-        val viewModel =
-            CourseUnitContainerViewModel("", "", config, interactor, notifier, analytics, networkConnection)
+        val viewModel = CourseUnitContainerViewModel(
+            "",
+            "",
+            CourseViewMode.VIDEOS,
+            config,
+            interactor,
+            notifier,
+            analytics,
+            networkConnection,
+            videoPreviewHelper
+        )
         coEvery { interactor.getCourseStructure(any()) } returns courseStructure
         coEvery { interactor.getCourseStructureForVideos(any()) } returns courseStructure
 
-        viewModel.loadBlocks(CourseViewMode.VIDEOS, "id")
+        viewModel.loadBlocks("id3")
 
         advanceUntilIdle()
 
@@ -267,12 +324,21 @@ class CourseUnitContainerViewModelTest {
     @Test
     fun `moveToPrevBlock not null`() = runTest {
         every { notifier.notifier } returns MutableSharedFlow()
-        val viewModel =
-            CourseUnitContainerViewModel("", "id", config, interactor, notifier, analytics, networkConnection)
+        val viewModel = CourseUnitContainerViewModel(
+            "",
+            "id",
+            CourseViewMode.VIDEOS,
+            config,
+            interactor,
+            notifier,
+            analytics,
+            networkConnection,
+            videoPreviewHelper
+        )
         coEvery { interactor.getCourseStructure(any()) } returns courseStructure
         coEvery { interactor.getCourseStructureForVideos(any()) } returns courseStructure
 
-        viewModel.loadBlocks(CourseViewMode.VIDEOS, "id1")
+        viewModel.loadBlocks("id1")
 
         advanceUntilIdle()
 
@@ -284,12 +350,21 @@ class CourseUnitContainerViewModelTest {
     @Test
     fun `moveToNextBlock null`() = runTest {
         every { notifier.notifier } returns MutableSharedFlow()
-        val viewModel =
-            CourseUnitContainerViewModel("", "", config, interactor, notifier, analytics, networkConnection)
+        val viewModel = CourseUnitContainerViewModel(
+            "",
+            "",
+            CourseViewMode.VIDEOS,
+            config,
+            interactor,
+            notifier,
+            analytics,
+            networkConnection,
+            videoPreviewHelper
+        )
         coEvery { interactor.getCourseStructure(any()) } returns courseStructure
         coEvery { interactor.getCourseStructureForVideos(any()) } returns courseStructure
 
-        viewModel.loadBlocks(CourseViewMode.VIDEOS, "id3")
+        viewModel.loadBlocks("id3")
 
         advanceUntilIdle()
 
@@ -301,12 +376,21 @@ class CourseUnitContainerViewModelTest {
     @Test
     fun `moveToNextBlock not null`() = runTest {
         every { notifier.notifier } returns MutableSharedFlow()
-        val viewModel =
-            CourseUnitContainerViewModel("", "id", config, interactor, notifier, analytics, networkConnection)
+        val viewModel = CourseUnitContainerViewModel(
+            "",
+            "id",
+            CourseViewMode.VIDEOS,
+            config,
+            interactor,
+            notifier,
+            analytics,
+            networkConnection,
+            videoPreviewHelper
+        )
         coEvery { interactor.getCourseStructure("") } returns courseStructure
         coEvery { interactor.getCourseStructureForVideos("") } returns courseStructure
 
-        viewModel.loadBlocks(CourseViewMode.VIDEOS, "id")
+        viewModel.loadBlocks("id")
 
         advanceUntilIdle()
 
@@ -318,12 +402,21 @@ class CourseUnitContainerViewModelTest {
     @Test
     fun `currentIndex isLastIndex`() = runTest {
         every { notifier.notifier } returns MutableSharedFlow()
-        val viewModel =
-            CourseUnitContainerViewModel("", "", config, interactor, notifier, analytics, networkConnection)
+        val viewModel = CourseUnitContainerViewModel(
+            "",
+            "",
+            CourseViewMode.VIDEOS,
+            config,
+            interactor,
+            notifier,
+            analytics,
+            networkConnection,
+            videoPreviewHelper
+        )
         coEvery { interactor.getCourseStructure(any()) } returns courseStructure
         coEvery { interactor.getCourseStructureForVideos(any()) } returns courseStructure
 
-        viewModel.loadBlocks(CourseViewMode.VIDEOS, "id3")
+        viewModel.loadBlocks("id3")
 
         advanceUntilIdle()
 
