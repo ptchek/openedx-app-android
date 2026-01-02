@@ -61,6 +61,11 @@ android {
             setupBranchConfigFields(it)
             setupFirebaseConfigFields(it)
         }
+        smatflow {
+            dimension 'env'
+            setupBranchConfigFields(it)
+            setupFirebaseConfigFields(it)
+        }
     }
 
     sourceSets {
@@ -71,6 +76,9 @@ android {
             res.srcDirs = ["src/$themeDirectory/res"]
         }
         stage {
+            res.srcDirs = ["src/$themeDirectory/res"]
+        }
+        smatflow {
             res.srcDirs = ["src/$themeDirectory/res"]
         }
     }

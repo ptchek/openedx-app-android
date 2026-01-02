@@ -1,0 +1,112 @@
+# Smatflow Academy - OpenEdX Android App Configuration
+# Points to: openedx.dev-lms.smatflow.xyz
+
+API_HOST_URL: 'https://openedx.dev-lms.smatflow.xyz'
+APPLICATION_ID: 'com.smatflow.academy'
+ENVIRONMENT_DISPLAY_NAME: 'Smatflow Academy'
+URI_SCHEME: 'com.smatflow.academy'
+FEEDBACK_EMAIL_ADDRESS: 'support@smatflow.xyz'
+FAQ_URL: ''
+
+# OAuth2 Configuration - Identity Server SSO
+OAUTH_CLIENT_ID: 'smatflow_openedx_bc0fdfb590896424'
+
+# Agreement URLs
+AGREEMENT_URLS:
+  PRIVACY_POLICY_URL: 'https://smatflow.xyz/privacy'
+  COOKIE_POLICY_URL: ''
+  DATA_SELL_CONSENT_URL: ''
+  TOS_URL: 'https://smatflow.xyz/terms'
+  EULA_URL: ''
+  SUPPORTED_LANGUAGES: ['fr', 'en']
+
+# Discovery - Native course catalog
+DISCOVERY:
+  TYPE: 'native'
+  WEBVIEW:
+    BASE_URL: ''
+    COURSE_DETAIL_TEMPLATE: ''
+    PROGRAM_DETAIL_TEMPLATE: ''
+
+PROGRAM:
+  TYPE: 'native'
+  WEBVIEW:
+    BASE_URL: ''
+    PROGRAM_DETAIL_TEMPLATE: ''
+
+DASHBOARD:
+  TYPE: 'gallery'
+
+# Firebase - Disabled for now
+FIREBASE:
+  ENABLED: false
+  CLOUD_MESSAGING_ENABLED: false
+  PROJECT_NUMBER: ''
+  PROJECT_ID: ''
+  APPLICATION_ID: ''
+  API_KEY: ''
+
+# Braze - Disabled
+BRAZE:
+  ENABLED: false
+  PUSH_NOTIFICATIONS_ENABLED: false
+
+# Social Login - Using Smatflow Identity Server SSO instead
+GOOGLE:
+  ENABLED: false
+  CLIENT_ID: ''
+
+MICROSOFT:
+  ENABLED: false
+  CLIENT_ID: ''
+  PACKAGE_SIGNATURE: ''
+
+FACEBOOK:
+  ENABLED: false
+  FACEBOOK_APP_ID: ''
+  CLIENT_TOKEN: ''
+
+# Branch - Disabled
+BRANCH:
+  ENABLED: false
+  KEY: ''
+  URI_SCHEME: ''
+  HOST: ''
+  ALTERNATE_HOST: ''
+
+# Experimental Features
+EXPERIMENTAL_FEATURES:
+  APP_LEVEL_DOWNLOADS:
+    ENABLED: true
+  APP_LEVEL_DATES:
+    ENABLED: true
+
+# Platform Branding
+PLATFORM_NAME: "Smatflow Academy"
+PLATFORM_FULL_NAME: "Smatflow Academy - Formation Continue"
+
+# Theme Directory - Custom theme for Smatflow
+THEME_DIRECTORY: "openedx"
+
+# Token Type - JWT for SSO
+TOKEN_TYPE: "JWT"
+
+# What's New Feature
+WHATS_NEW_ENABLED: true
+
+# Social Auth - DISABLED (using Browser SSO with Identity Server)
+SOCIAL_AUTH_ENABLED: false
+
+# Registration - Disabled (all registration via Identity Server)
+REGISTRATION_ENABLED: false
+
+# ===== SSO Configuration =====
+# Browser-based SSO Login with Smatflow Identity Server
+BROWSER_LOGIN: true
+BROWSER_REGISTRATION: true
+
+# Course Navigation Features
+UI_COMPONENTS:
+  COURSE_DROPDOWN_NAVIGATION_ENABLED: true
+  COURSE_UNIT_PROGRESS_ENABLED: true
+  COURSE_DOWNLOAD_QUEUE_SCREEN: true
